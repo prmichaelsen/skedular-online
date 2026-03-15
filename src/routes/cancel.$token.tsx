@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { getBookingByCancelToken, cancelBooking } from '@/lib/firestore'
-import type { Booking } from '@/lib/types'
+import { getBookingByCancelToken, cancelBooking, getUserProfile } from '@/lib/firestore'
+import { sendCancellationEmail } from '@/lib/server-fn'
+import type { Booking, UserProfile } from '@/lib/types'
 import { XCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/cancel/$token')({
@@ -11,6 +12,7 @@ export const Route = createFileRoute('/cancel/$token')({
 function CancelPage() {
   const { token } = Route.useParams()
   const [booking, setBooking] = useState<Booking | null>(null)
+  const [owner, setOwner] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [cancelled, setCancelled] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -25,6 +27,9 @@ function CancelPage() {
         setBooking(b)
       } else {
         setBooking(b)
+        // Fetch owner for cancellation email
+        const o = await getUserProfile(b.userId)
+        setOwner(o)
       }
       setLoading(false)
     })()
@@ -34,6 +39,23 @@ function CancelPage() {
     if (!booking?.id) return
     await cancelBooking(booking.id)
     setCancelled(true)
+
+    // Send cancellation emails (fire-and-forget)
+    if (owner) {
+      sendCancellationEmail({
+        data: {
+          ownerName: owner.name,
+          ownerEmail: owner.email,
+          bookerName: booking.bookerName,
+          bookerEmail: booking.bookerEmail,
+          date: booking.date,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          duration: owner.settings.defaultDuration,
+          username: owner.username,
+        },
+      }).catch((err) => console.error('Failed to send cancellation email:', err))
+    }
   }
 
   if (loading) {

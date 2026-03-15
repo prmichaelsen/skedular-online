@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useMemo } from 'react'
 import { createBooking } from '@/lib/firestore'
-import { fetchBookingPageData } from '@/lib/server-fn'
+import { fetchBookingPageData, sendBookingConfirmation } from '@/lib/server-fn'
 import type { UserProfile, Availability, Booking, AvailabilityWindow } from '@/lib/types'
 import { Calendar, Clock, Check, ArrowLeft, ArrowRight } from 'lucide-react'
 
@@ -147,20 +147,41 @@ function BookingPage() {
       const endMin = sh * 60 + sm + duration
       const endTime = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const cancelToken = randomToken()
+      const date = selectedDate.toISOString().split('T')[0]
 
       await createBooking({
         userId: owner.uid,
         bookerEmail,
         bookerName,
         notes: notes || undefined,
-        date: selectedDate.toISOString().split('T')[0],
+        date,
         startTime: selectedSlot,
         endTime,
         timezone: tz,
         status: 'confirmed',
-        cancelToken: randomToken(),
+        cancelToken,
         createdAt: new Date().toISOString(),
       })
+
+      // Send confirmation emails (fire-and-forget, don't block UX)
+      sendBookingConfirmation({
+        data: {
+          ownerName: owner.name,
+          ownerEmail: owner.email,
+          bookerName,
+          bookerEmail,
+          date,
+          startTime: selectedSlot,
+          endTime,
+          duration,
+          timezone: tz,
+          notes: notes || undefined,
+          cancelToken,
+          username: owner.username,
+        },
+      }).catch((err) => console.error('Failed to send confirmation email:', err))
+
       setConfirmed(true)
     } finally {
       setSubmitting(false)
