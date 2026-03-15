@@ -6,30 +6,69 @@ project:
   description: |
     Online availability painter web app and scheduler clone like Calendly
 
-milestones: []
+milestones:
+  - id: M1
+    name: Email Infrastructure
+    file: agent/milestones/milestone-1-email-infrastructure.md
+    status: in_progress
+    progress: 50
+    started: 2026-03-15
+    completed: null
+    estimated_weeks: 1
+    tasks_completed: 1
+    tasks_total: 2
 
-tasks: {}
+tasks:
+  milestone_1:
+    - id: task-1
+      name: Mandrill Email Service + API Route
+      status: complete
+      started: 2026-03-15
+      actual_hours: null
+      file: agent/tasks/milestone-1-email-infrastructure/task-1-mandrill-email-service.md
+      estimated_hours: 2
+      completed_date: 2026-03-15
+    - id: task-2
+      name: Wire Booking Confirmation + Cancellation Emails
+      status: in_progress
+      started: 2026-03-15
+      actual_hours: null
+      file: agent/tasks/milestone-1-email-infrastructure/task-2-wire-booking-emails.md
+      estimated_hours: 2
+      completed_date: null
+      dependencies:
+        - task-1
 
 documentation:
   design_documents: 1
-  milestone_documents: 0
+  milestone_documents: 1
   pattern_documents: 48
-  task_documents: 0
+  task_documents: 2
 
 progress:
-  planning: 0
-  implementation: 0
-  overall: 0
+  planning: 100
+  implementation: 50
+  overall: 50
 
 recent_work:
   - date: 2026-03-15
-    description: Installed tanstack-cloudflare package (v2.0.0) - 48 patterns, 4 commands, 1 design doc, 39 starter template files
+    description: Built and deployed MVP, planned email infrastructure milestone
+    items:
+      - "✅ Full MVP scaffolded and deployed to skedular.online"
+      - "✅ Firebase Auth + Firestore working in production"
+      - "✅ DNS configured for skedular.online"
+      - "📋 Planned M1: Email Infrastructure (2 tasks)"
 
 next_steps:
-  - Define project requirements in agent/design/requirements.md
-  - Plan milestones and tasks with @acp.plan
-  - Start development with @acp.proceed
+  - Complete Task 2 — wire sendBookingConfirmation into $username.tsx booking flow
+  - Complete Task 2 — wire sendCancellationEmail into cancel.$token.tsx flow
+  - Fix dashboard.tsx missing imports (getAvailability, getBookingsForUser)
+  - Upload MANDRILL_API_KEY as Cloudflare secret
+  - Deploy and test end-to-end
 
-notes: []
+notes:
+  - MVP built in ~1 hour on 2026-03-15
+  - Firestore rules deployed (users read:all write:owner, bookings create:all)
 
-current_blockers: []
+current_blockers:
+  - Need Mandrill API key from user

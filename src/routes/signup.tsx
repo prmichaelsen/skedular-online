@@ -56,13 +56,14 @@ function SignupPage() {
       await createUserProfile(cred.user.uid, { email, name, username, timezone })
       navigate({ to: '/dashboard' })
     } catch (err: any) {
+      console.error('Signup error:', err?.code, err?.message, err)
       const code = err?.code || ''
       if (code === 'auth/email-already-in-use') {
         setError('Email already in use')
       } else if (code === 'auth/weak-password') {
         setError('Password must be at least 6 characters')
       } else {
-        setError('Something went wrong. Please try again.')
+        setError(`Error: ${code || err?.message || 'Unknown error'}`)
       }
     } finally {
       setLoading(false)

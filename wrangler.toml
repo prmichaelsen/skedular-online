@@ -3,6 +3,11 @@ main = "src/server.ts"
 compatibility_date = "2026-03-12"
 compatibility_flags = ["nodejs_compat"]
 
+routes = [
+  { pattern = "skedular.online/*", zone_name = "skedular.online" },
+  { pattern = "www.skedular.online/*", zone_name = "skedular.online" },
+]
+
 [placement]
 mode = "smart"
 
@@ -30,6 +35,6 @@ namespace_id = "1002"
 simple = { limit = 100, period = 60 }
 
 [vars]
-VITE_FIREBASE_API_KEY = ""
-VITE_FIREBASE_AUTH_DOMAIN = ""
-VITE_FIREBASE_PROJECT_ID = ""
+VITE_FIREBASE_API_KEY = "AIzaSyAkF6W-Mv5JcFg-DSwdggJJisKq49BXZJU"
+VITE_FIREBASE_AUTH_DOMAIN = "skedular-online-prod.firebaseapp.com"
+VITE_FIREBASE_PROJECT_ID = "skedular-online-prod"

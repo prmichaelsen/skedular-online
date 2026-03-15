@@ -1,10 +1,26 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect, useMemo } from 'react'
-import { getUserByUsername, getAvailability, getBookingsForUser, createBooking } from '@/lib/firestore'
+import { useState, useMemo } from 'react'
+import { createBooking } from '@/lib/firestore'
+import { fetchBookingPageData } from '@/lib/server-fn'
 import type { UserProfile, Availability, Booking, AvailabilityWindow } from '@/lib/types'
 import { Calendar, Clock, Check, ArrowLeft, ArrowRight } from 'lucide-react'
 
 export const Route = createFileRoute('/$username')({
+  beforeLoad: async ({ params }) => {
+    let initialData: { owner: UserProfile | null; availability: Availability | null; bookings: Booking[] } = {
+      owner: null,
+      availability: null,
+      bookings: [],
+    }
+
+    try {
+      initialData = await fetchBookingPageData(params.username)
+    } catch (error) {
+      console.error('Failed to preload booking page data:', error)
+    }
+
+    return { initialData }
+  },
   component: BookingPage,
 })
 
@@ -28,8 +44,7 @@ function getAvailableSlots(
   bookings: Booking[],
   duration: number,
   buffer: number,
-  minNotice: number,
-  _ownerTimezone: string
+  minNotice: number
 ): string[] {
   const dow = date.getDay()
   const dayWindows = windows.filter((w) => w.dayOfWeek === dow)
@@ -47,12 +62,10 @@ function getAvailableSlots(
         const startMin = h * 60 + m
         const endMin = startMin + duration
 
-        // Check min notice
         const slotTime = new Date(date)
         slotTime.setHours(h, m, 0, 0)
         if (slotTime.getTime() - now.getTime() < minNotice * 60 * 1000) continue
 
-        // Check conflicts with existing bookings
         const hasConflict = dayBookings.some((b) => {
           const [bh, bm] = b.startTime.split(':').map(Number)
           const [eh, em] = b.endTime.split(':').map(Number)
@@ -91,12 +104,11 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 // ── Component ──────────────────────────────────────────
 
 function BookingPage() {
-  const { username } = Route.useParams()
-  const [owner, setOwner] = useState<UserProfile | null>(null)
-  const [availability, setAvailability] = useState<Availability | null>(null)
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  // SSR data from beforeLoad — no loading spinner needed
+  const { initialData } = Route.useRouteContext()
+  const owner = initialData.owner
+  const availability = initialData.availability
+  const bookings = initialData.bookings
 
   // Booking flow state
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -107,22 +119,6 @@ function BookingPage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
-
-  useEffect(() => {
-    ;(async () => {
-      const u = await getUserByUsername(username)
-      if (!u) {
-        setNotFound(true)
-        setLoading(false)
-        return
-      }
-      setOwner(u)
-      const [avail, bk] = await Promise.all([getAvailability(u.uid), getBookingsForUser(u.uid)])
-      setAvailability(avail)
-      setBookings(bk)
-      setLoading(false)
-    })()
-  }, [username])
 
   const dates = useMemo(() => generateDates(4), [])
   const weekDates = useMemo(() => {
@@ -138,8 +134,7 @@ function BookingPage() {
       bookings,
       owner.settings.defaultDuration,
       owner.settings.bufferTime,
-      owner.settings.minNotice,
-      owner.timezone
+      owner.settings.minNotice
     )
   }, [selectedDate, availability, owner, bookings])
 
@@ -172,22 +167,14 @@ function BookingPage() {
     }
   }
 
-  // ── Loading / Not Found ──
+  // ── Not Found ──
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-text-muted">Loading...</div>
-      </div>
-    )
-  }
-
-  if (notFound) {
+  if (!owner) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-300 mb-2">Not found</h1>
-          <p className="text-text-secondary">No user with username "{username}"</p>
+          <p className="text-text-secondary">No user with that username</p>
         </div>
       </div>
     )
@@ -204,7 +191,7 @@ function BookingPage() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Booking confirmed!</h1>
           <p className="text-text-secondary mb-6">
-            Your meeting with {owner!.name} on{' '}
+            Your meeting with {owner.name} on{' '}
             <span className="font-medium text-text-primary">
               {selectedDate!.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </span>{' '}
@@ -231,12 +218,12 @@ function BookingPage() {
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-2xl font-bold text-primary">
-              {owner!.name.charAt(0).toUpperCase()}
+              {owner.name.charAt(0).toUpperCase()}
             </span>
           </div>
-          <h1 className="text-xl font-bold">{owner!.name}</h1>
+          <h1 className="text-xl font-bold">{owner.name}</h1>
           <p className="text-text-secondary text-sm mt-1">
-            {owner!.settings.defaultDuration} min meeting
+            {owner.settings.defaultDuration} min meeting
           </p>
         </div>
 
@@ -313,7 +300,6 @@ function BookingPage() {
                   {availableSlots.length === 0 ? (
                     <p className="text-sm text-text-muted">No available times</p>
                   ) : selectedSlot ? (
-                    /* Booking form */
                     <div className="space-y-3">
                       <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                         <div className="flex items-center gap-2">
@@ -359,7 +345,6 @@ function BookingPage() {
                       </button>
                     </div>
                   ) : (
-                    /* Slot list */
                     <div className="space-y-1.5 max-h-80 overflow-y-auto">
                       {availableSlots.map((slot) => (
                         <button

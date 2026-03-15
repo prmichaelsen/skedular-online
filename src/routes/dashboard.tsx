@@ -14,7 +14,7 @@ function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [availability, setAvailability] = useState<CalendarPainterValue>({ mode: 'soonest' })
+  const [availability, setAvailability] = useState<CalendarPainterValue>({ mode: 'custom', windows: [] })
   const [bookings, setBookings] = useState<Booking[]>([])
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
