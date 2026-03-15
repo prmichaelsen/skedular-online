@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useMemo } from 'react'
-import { createBooking } from '@/lib/firestore'
-import { fetchBookingPageData, sendBookingConfirmation } from '@/lib/server-fn'
+import { fetchBookingPageData, createBookingWithConflictCheck, sendBookingConfirmation } from '@/lib/server-fn'
 import type { UserProfile, Availability, Booking, AvailabilityWindow } from '@/lib/types'
 import { Calendar, Clock, Check, ArrowLeft, ArrowRight } from 'lucide-react'
 
@@ -119,6 +118,7 @@ function BookingPage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
 
   const dates = useMemo(() => generateDates(4), [])
   const weekDates = useMemo(() => {
@@ -141,6 +141,7 @@ function BookingPage() {
   const handleBook = async () => {
     if (!owner || !selectedDate || !selectedSlot) return
     setSubmitting(true)
+    setBookingError(null)
     try {
       const duration = owner.settings.defaultDuration
       const [sh, sm] = selectedSlot.split(':').map(Number)
@@ -150,19 +151,26 @@ function BookingPage() {
       const cancelToken = randomToken()
       const date = selectedDate.toISOString().split('T')[0]
 
-      await createBooking({
-        userId: owner.uid,
-        bookerEmail,
-        bookerName,
-        notes: notes || undefined,
-        date,
-        startTime: selectedSlot,
-        endTime,
-        timezone: tz,
-        status: 'confirmed',
-        cancelToken,
-        createdAt: new Date().toISOString(),
+      const result = await createBookingWithConflictCheck({
+        data: {
+          userId: owner.uid,
+          bookerEmail,
+          bookerName,
+          notes: notes || undefined,
+          date,
+          startTime: selectedSlot,
+          endTime,
+          timezone: tz,
+          cancelToken,
+          bufferTime: owner.settings.bufferTime,
+        },
       })
+
+      if (!result.success) {
+        setBookingError(result.error)
+        setSelectedSlot(null)
+        return
+      }
 
       // Send confirmation emails (fire-and-forget, don't block UX)
       sendBookingConfirmation({
@@ -322,6 +330,11 @@ function BookingPage() {
                     <p className="text-sm text-text-muted">No available times</p>
                   ) : selectedSlot ? (
                     <div className="space-y-3">
+                      {bookingError && (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                          {bookingError}
+                        </div>
+                      )}
                       <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-primary" />

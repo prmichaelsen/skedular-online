@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getFirebaseDb, doc, getDoc, collection, query, where, getDocs } from './firebase-client'
+import { getFirebaseDb, doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } from './firebase-client'
 import { sendEmail } from './email'
 import { generateICS, toBase64 } from './ics'
 import { confirmationToBooker, confirmationToOwner, cancellationNotification } from './email-templates'
@@ -63,6 +63,74 @@ export async function fetchDashboardData(uid: string): Promise<{
 
   return { profile, availability, bookings }
 }
+
+// ── Email Server Functions ─────────────────────────────
+
+// ── Server-Side Booking with Conflict Check ───────────
+
+interface CreateBookingInput {
+  userId: string
+  bookerEmail: string
+  bookerName: string
+  notes?: string
+  date: string
+  startTime: string
+  endTime: string
+  timezone: string
+  cancelToken: string
+  bufferTime: number
+}
+
+export const createBookingWithConflictCheck = createServerFn({ method: 'POST' })
+  .inputValidator((input: CreateBookingInput) => input)
+  .handler(async ({ data }): Promise<{ success: true; bookingId: string } | { success: false; error: string; code: number }> => {
+    const db = getFirebaseDb()
+
+    // Check for conflicts
+    const bookingsSnap = await getDocs(
+      query(
+        collection(db, 'bookings'),
+        where('userId', '==', data.userId),
+        where('date', '==', data.date),
+        where('status', '==', 'confirmed')
+      )
+    )
+
+    const [sh, sm] = data.startTime.split(':').map(Number)
+    const [eh, em] = data.endTime.split(':').map(Number)
+    const newStart = sh * 60 + sm
+    const newEnd = eh * 60 + em
+    const buffer = data.bufferTime
+
+    for (const doc of bookingsSnap.docs) {
+      const existing = doc.data() as Booking
+      const [bsh, bsm] = existing.startTime.split(':').map(Number)
+      const [beh, bem] = existing.endTime.split(':').map(Number)
+      const existingStart = bsh * 60 + bsm
+      const existingEnd = beh * 60 + bem
+
+      if (newStart < existingEnd + buffer && newEnd + buffer > existingStart) {
+        return { success: false, error: 'This time slot has already been booked', code: 409 }
+      }
+    }
+
+    // No conflict — create the booking
+    const ref = await addDoc(collection(db, 'bookings'), {
+      userId: data.userId,
+      bookerEmail: data.bookerEmail,
+      bookerName: data.bookerName,
+      notes: data.notes,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      timezone: data.timezone,
+      status: 'confirmed',
+      cancelToken: data.cancelToken,
+      createdAt: new Date().toISOString(),
+    })
+
+    return { success: true, bookingId: ref.id }
+  })
 
 // ── Email Server Functions ─────────────────────────────
 
