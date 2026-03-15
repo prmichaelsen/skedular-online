@@ -110,7 +110,20 @@ function BookingPage() {
   const bookings = initialData.bookings
 
   // Booking flow state
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const dates = useMemo(() => generateDates(4), [])
+
+  // Find the first available date (has availability windows and isn't in the past)
+  const defaultDate = useMemo(() => {
+    if (!availability || availability.mode !== 'custom' || availability.windows.length === 0) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return dates.find((d) => {
+      if (d < today) return false
+      return availability.windows.some((w) => w.dayOfWeek === d.getDay())
+    }) ?? null
+  }, [dates, availability])
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(defaultDate)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const [bookerName, setBookerName] = useState('')
@@ -119,8 +132,6 @@ function BookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
-
-  const dates = useMemo(() => generateDates(4), [])
   const weekDates = useMemo(() => {
     const start = weekOffset * 7
     return dates.slice(start, start + 7)
