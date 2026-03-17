@@ -162,5 +162,61 @@ Scheduling meetings requires back-and-forth coordination. Users need a simple to
 
 ---
 
+## Key Design Decisions (from Clarification 2 - Calendar Sync)
+
+### .ics Feed Architecture
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Feed URL format | `skedular.online/cal/{username}.ics?token={secret}` | Secret token protects private booking details, rotatable from settings |
+| Feed consumers | Owner-only subscription feed | Booker gets single-event .ics via email (already in M1 scope) |
+| Feed content | Confirmed bookings only | Availability windows would clutter calendar view with 20+ "Available" blocks per week |
+| Booking details visibility | Full details (booker name in title, email/notes in description, cancel link) | Token-protected feed means only owner sees details |
+| User control | Disabled by default, settings toggle + "Regenerate URL" button | Opt-in with token rotation if URL leaks |
+| Cancelled bookings | Removed from feed entirely | Calendar apps handle removal better than STATUS:CANCELLED |
+| Rate limiting | 60 requests/minute per token via Cloudflare | Polling frequency controlled by subscribing calendar app (Google: 12-24hr, Apple: ~15min) |
+
+### Google Calendar Integration
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Primary use case | Conflict checking via FreeBusy API | Prevents double-bookings with user's existing calendar events |
+| OAuth scope | `calendar.readonly` only (read-only) | Zero risk of modifying user's calendar inappropriately |
+| Conflict resolution | Hide conflicting slots from booking page | Better UX than showing slots that get rejected at booking time |
+| Query strategy | Real-time FreeBusy queries with 5-minute cache | Always accurate, fast (~100-200ms), avoids stale sync data |
+| OAuth setup | "Connect Google Calendar" button in settings | Standard OAuth flow with connect/disconnect status display |
+| Token refresh | Proactive refresh via Cloudflare cron job before expiry | Prevents token expiration for active users |
+| Token revocation | Graceful degradation (skip conflict checking, show banner) | Allows bookings to continue even if Google connection breaks |
+| Multiple calendars | Check all calendars in MVP, add picker later | FreeBusy API supports multiple calendar IDs in one call |
+
+### Write-Back Strategy (Security-First)
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Approach | Read-only OAuth + .ics feed (Option C) | Avoids `calendar.events` scope which would allow deleting ANY user event |
+| Write mechanism | .ics subscription feed for auto-sync + email attachment for manual add | No direct calendar API writes required |
+| Security trade-off | Events don't appear instantly (12-24hr polling delay) | Acceptable given zero risk of inappropriate calendar modifications |
+| Future path | Opt-in write permission toggle if users demand instant sync | Can add later with clear warnings about broader permissions |
+
+### Multi-Provider Support
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Architecture | Provider-adapter pattern from day one | Makes adding Outlook trivial later even if Google ships first |
+| Google Calendar | P1 - Ships in M2 | 80% market share for personal/small-business scheduling |
+| Outlook/M365 | P2 - Same features/UX via Microsoft Graph API | Enterprise-focused, add after validating pattern with Google |
+| Apple Calendar | .ics subscription feed sufficient | No OAuth-based API, but native .ics support covers use case |
+| Provider interface | `checkConflicts()`, `getAuthUrl()`, `handleCallback()`, `refreshToken()` | Common interface abstracts provider differences |
+
+### Feature Sequencing
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Milestone | New M2 - Calendar Sync | Distinct from M1 Email Infrastructure, clear dependencies |
+| Ship order | .ics feed first, then Google Calendar OAuth | Simpler feature delivers value immediately, OAuth builds on it |
+| Task 4 removal | No direct Google Calendar API write-back | Using read-only OAuth + .ics feed instead (security decision) |
+
+---
+
 **Status**: Active
-**Last Updated**: 2026-03-15
+**Last Updated**: 2026-03-17
