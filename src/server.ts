@@ -1,9 +1,50 @@
 import startServer from '@tanstack/react-start/server-entry'
 import { generateICSFeed } from './lib/server-fn'
+import { googleCalendarProvider } from './lib/calendar-providers/google'
+import { saveGoogleCalendarConnection } from './lib/firestore'
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url)
+
+    // Handle Google OAuth callback
+    if (url.pathname === '/auth/google/callback') {
+      const code = url.searchParams.get('code')
+      const state = url.searchParams.get('state')
+      const error = url.searchParams.get('error')
+
+      // Build redirect URL with query params preserved
+      const dashboardUrl = new URL('/dashboard', url.origin)
+
+      if (error) {
+        dashboardUrl.searchParams.set('oauth_error', 'cancelled')
+        return Response.redirect(dashboardUrl.toString(), 302)
+      }
+
+      if (!code || !state) {
+        dashboardUrl.searchParams.set('oauth_error', 'invalid_callback')
+        return Response.redirect(dashboardUrl.toString(), 302)
+      }
+
+      try {
+        const userId = decodeURIComponent(state)
+        const redirectUri = `${url.origin}/auth/google/callback`
+        const tokens = await googleCalendarProvider.handleCallback(code, userId, redirectUri)
+
+        await saveGoogleCalendarConnection(userId, {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expires_at: tokens.expires_at,
+        })
+
+        dashboardUrl.searchParams.set('oauth_success', 'true')
+        return Response.redirect(dashboardUrl.toString(), 302)
+      } catch (err) {
+        console.error('Google OAuth callback error:', err)
+        dashboardUrl.searchParams.set('oauth_error', 'failed')
+        return Response.redirect(dashboardUrl.toString(), 302)
+      }
+    }
 
     // Handle .ics calendar feed requests
     const icsMatch = url.pathname.match(/^\/cal\/([^/]+)\.ics$/)

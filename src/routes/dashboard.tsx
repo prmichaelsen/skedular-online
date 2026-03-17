@@ -29,10 +29,35 @@ function DashboardPage() {
   const [calendarFeedUrl, setCalendarFeedUrl] = useState<string | null>(null)
   const [feedCopied, setFeedCopied] = useState(false)
   const [enablingFeed, setEnablingFeed] = useState(false)
+  const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/login' })
   }, [user, authLoading, navigate])
+
+  // Handle OAuth callback query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauthSuccess = params.get('oauth_success')
+    const oauthError = params.get('oauth_error')
+
+    if (oauthSuccess) {
+      setOauthMessage({ type: 'success', text: 'Google Calendar connected successfully!' })
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard')
+      setTimeout(() => setOauthMessage(null), 5000)
+    } else if (oauthError) {
+      const errorMessages: Record<string, string> = {
+        cancelled: 'Google Calendar connection was cancelled',
+        invalid_callback: 'Invalid OAuth callback',
+        failed: 'Failed to connect Google Calendar',
+      }
+      setOauthMessage({ type: 'error', text: errorMessages[oauthError] || 'OAuth error occurred' })
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard')
+      setTimeout(() => setOauthMessage(null), 5000)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -202,6 +227,24 @@ function DashboardPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* OAuth success/error toast */}
+        {oauthMessage && (
+          <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+            oauthMessage.type === 'success'
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <span className="text-xl">
+              {oauthMessage.type === 'success' ? '✓' : '✕'}
+            </span>
+            <p className={`text-sm font-medium ${
+              oauthMessage.type === 'success' ? 'text-green-900' : 'text-red-900'
+            }`}>
+              {oauthMessage.text}
+            </p>
+          </div>
+        )}
+
         {/* Google Calendar disconnected banner */}
         {googleCalendarNeedsAttention && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-3">

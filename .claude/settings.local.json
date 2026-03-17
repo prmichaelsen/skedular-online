@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(./agent/scripts/acp.package-install.sh --repo https://github.com/prmichaelsen/acp-tanstack-cloudflare.git -y 2>&1)",
+      "Bash(git add:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(openssl rand:*)",
+      "Bash(npm run:*)",
+      "Bash(which firebase:*)",
+      "Bash(grep:*)",
+      "Bash(dig:*)",
+      "Bash(git diff:*)",
+      "Bash(./agent/scripts/acp.sessions.sh register:*)",
+      "Bash(./agent/scripts/acp.sessions.sh list:*)",
+      "mcp__remember-mcp__remember_query_memory",
+      "Bash(ls -la src/routes/*.ics.*)"
+    ]
+  }
+}
