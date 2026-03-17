@@ -390,6 +390,38 @@ export const sendCancellationEmail = createServerFn({ method: 'POST' })
   }
 )
 
+// ── Google Calendar Integration ───────────────────────────
+
+interface GetGoogleOAuthUrlInput {
+  userId: string
+}
+
+export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
+  .inputValidator((input: GetGoogleOAuthUrlInput) => input)
+  .handler(async ({ data, context }): Promise<{ authUrl: string }> => {
+    const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
+
+    // Get env from context (Cloudflare Worker env)
+    const env = (context as any)?.cloudflare?.env || {}
+    const clientId = env.GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID
+    const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
+
+    if (!clientId) {
+      throw new Error('GOOGLE_CLIENT_ID not configured')
+    }
+
+    const provider = createGoogleCalendarProvider({
+      GOOGLE_CLIENT_ID: clientId,
+      GOOGLE_CLIENT_SECRET: clientSecret,
+    })
+
+    const baseUrl = env.VITE_APP_URL || import.meta.env.VITE_APP_URL || 'https://skedular.online'
+    const redirectUri = `${baseUrl}/auth/google/callback`
+    const authUrl = provider.getAuthUrl(data.userId, redirectUri)
+
+    return { authUrl }
+  })
+
 // ── Google Calendar Conflict Checking ─────────────────────
 
 interface CheckConflictsInput {
@@ -404,7 +436,7 @@ interface BusyWindow {
 
 export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
   .inputValidator((input: CheckConflictsInput) => input)
-  .handler(async ({ data }): Promise<{ connected: boolean; busyWindows: BusyWindow[] }> => {
+  .handler(async ({ data, context }): Promise<{ connected: boolean; busyWindows: BusyWindow[] }> => {
     const db = getFirebaseDb()
 
     // Get user's Google Calendar connection
@@ -436,8 +468,18 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
       const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59))
 
       // Query Google Calendar FreeBusy API
-      const { googleCalendarProvider } = await import('@/lib/calendar-providers/google')
-      const busyWindows = await googleCalendarProvider.checkConflicts(googleCalendar.access_token, {
+      const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
+
+      const env = (context as any)?.cloudflare?.env || {}
+      const clientId = env.GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID
+      const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
+
+      const provider = createGoogleCalendarProvider({
+        GOOGLE_CLIENT_ID: clientId,
+        GOOGLE_CLIENT_SECRET: clientSecret,
+      })
+
+      const busyWindows = await provider.checkConflicts(googleCalendar.access_token, {
         start: startDate,
         end: endDate,
       })

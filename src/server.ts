@@ -1,10 +1,10 @@
 import startServer from '@tanstack/react-start/server-entry'
 import { generateICSFeed } from './lib/server-fn'
-import { googleCalendarProvider } from './lib/calendar-providers/google'
+import { createGoogleCalendarProvider } from './lib/calendar-providers/google'
 import { saveGoogleCalendarConnection } from './lib/firestore'
 
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+  async fetch(request: Request, env: any, ctx: unknown) {
     const url = new URL(request.url)
 
     // Handle Google OAuth callback
@@ -29,7 +29,10 @@ export default {
       try {
         const userId = decodeURIComponent(state)
         const redirectUri = `${url.origin}/auth/google/callback`
-        const tokens = await googleCalendarProvider.handleCallback(code, userId, redirectUri)
+
+        // Create provider with env vars
+        const provider = createGoogleCalendarProvider(env)
+        const tokens = await provider.handleCallback(code, userId, redirectUri)
 
         await saveGoogleCalendarConnection(userId, {
           access_token: tokens.access_token,

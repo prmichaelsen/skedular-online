@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { CalendarPainter, type CalendarPainterValue } from '@/components/CalendarPainter'
 import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken, disconnectGoogleCalendar } from '@/lib/firestore'
-import { googleCalendarProvider } from '@/lib/calendar-providers/google'
+import { getGoogleCalendarOAuthUrl } from '@/lib/server-fn'
 import type { UserProfile, Booking } from '@/lib/types'
 import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock, Link2, X, AlertTriangle } from 'lucide-react'
 
@@ -176,11 +176,15 @@ function DashboardPage() {
     setTimeout(() => setFeedCopied(false), 2000)
   }
 
-  const handleConnectGoogleCalendar = () => {
+  const handleConnectGoogleCalendar = async () => {
     if (!user) return
-    const redirectUri = `${window.location.origin}/auth/google/callback`
-    const authUrl = googleCalendarProvider.getAuthUrl(user.uid, redirectUri)
-    window.location.href = authUrl
+    try {
+      const result = await getGoogleCalendarOAuthUrl({ data: { userId: user.uid } })
+      window.location.href = result.authUrl
+    } catch (error) {
+      console.error('Failed to get OAuth URL:', error)
+      setOauthMessage({ type: 'error', text: 'Failed to start Google Calendar connection' })
+    }
   }
 
   const handleDisconnectGoogleCalendar = async () => {

@@ -13,12 +13,16 @@ export class GoogleCalendarProvider implements CalendarProvider {
   private clientId: string
   private clientSecret: string
 
-  constructor() {
-    this.clientId = process.env.GOOGLE_CLIENT_ID || ''
-    this.clientSecret = process.env.GOOGLE_CLIENT_SECRET || ''
+  constructor(clientId?: string, clientSecret?: string) {
+    // In Cloudflare Workers, env vars must be passed explicitly
+    this.clientId = clientId || ''
+    this.clientSecret = clientSecret || ''
 
-    if (!this.clientId || !this.clientSecret) {
-      console.warn('Google Calendar: Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables')
+    if (!this.clientId) {
+      console.warn('Google Calendar: Missing GOOGLE_CLIENT_ID')
+    }
+    if (!this.clientSecret) {
+      console.warn('Google Calendar: Missing GOOGLE_CLIENT_SECRET')
     }
   }
 
@@ -27,6 +31,10 @@ export class GoogleCalendarProvider implements CalendarProvider {
    * Scope: calendar.readonly (read-only access to calendar events)
    */
   getAuthUrl(userId: string, redirectUri: string): string {
+    if (!this.clientId) {
+      throw new Error('GOOGLE_CLIENT_ID not configured')
+    }
+
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: redirectUri,
@@ -157,6 +165,12 @@ export class GoogleCalendarProvider implements CalendarProvider {
 }
 
 /**
- * Singleton instance for app-wide use
+ * Create provider instance with environment variables
+ * Must be called with env vars from Cloudflare Worker context
  */
-export const googleCalendarProvider = new GoogleCalendarProvider()
+export function createGoogleCalendarProvider(env: any): GoogleCalendarProvider {
+  return new GoogleCalendarProvider(
+    env.GOOGLE_CLIENT_ID,
+    env.GOOGLE_CLIENT_SECRET
+  )
+}
