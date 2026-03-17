@@ -389,3 +389,71 @@ export const sendCancellationEmail = createServerFn({ method: 'POST' })
     }
   }
 )
+
+// ── Google Calendar Conflict Checking ─────────────────────
+
+interface CheckConflictsInput {
+  userId: string
+  date: string // YYYY-MM-DD
+}
+
+interface BusyWindow {
+  start: string // ISO timestamp
+  end: string // ISO timestamp
+}
+
+export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
+  .inputValidator((input: CheckConflictsInput) => input)
+  .handler(async ({ data }): Promise<{ connected: boolean; busyWindows: BusyWindow[] }> => {
+    const db = getFirebaseDb()
+
+    // Get user's Google Calendar connection
+    const userDoc = await getDoc(doc(db, 'users', data.userId))
+    if (!userDoc.exists()) {
+      return { connected: false, busyWindows: [] }
+    }
+
+    const userData = userDoc.data()
+    const googleCalendar = userData.google_calendar
+
+    // Check if Google Calendar is connected
+    if (!googleCalendar || !googleCalendar.connected) {
+      return { connected: false, busyWindows: [] }
+    }
+
+    // Check if token is expired (should be refreshed proactively, but handle here too)
+    if (googleCalendar.expires_at < Date.now()) {
+      // Token expired - return disconnected (graceful degradation)
+      // TODO: In production, this should trigger a token refresh attempt
+      console.warn(`Google Calendar token expired for user ${data.userId}`)
+      return { connected: false, busyWindows: [] }
+    }
+
+    try {
+      // Parse date and create time range for the full day
+      const [year, month, day] = data.date.split('-').map(Number)
+      const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+      const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59))
+
+      // Query Google Calendar FreeBusy API
+      const { googleCalendarProvider } = await import('@/lib/calendar-providers/google')
+      const busyWindows = await googleCalendarProvider.checkConflicts(googleCalendar.access_token, {
+        start: startDate,
+        end: endDate,
+      })
+
+      // Convert Date objects to ISO strings for JSON serialization
+      return {
+        connected: true,
+        busyWindows: busyWindows.map((window) => ({
+          start: window.start.toISOString(),
+          end: window.end.toISOString(),
+        })),
+      }
+    } catch (error) {
+      // Fail open - if conflict checking fails, allow bookings to proceed
+      console.error('Google Calendar conflict check failed:', error)
+      return { connected: false, busyWindows: [] }
+    }
+  }
+)

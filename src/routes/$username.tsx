@@ -1,8 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
-import { fetchBookingPageData, createBookingWithConflictCheck, sendBookingConfirmation } from '@/lib/server-fn'
+import { useState, useMemo, useEffect } from 'react'
+import { fetchBookingPageData, createBookingWithConflictCheck, sendBookingConfirmation, checkGoogleCalendarConflicts } from '@/lib/server-fn'
 import type { UserProfile, Availability, Booking, AvailabilityWindow } from '@/lib/types'
 import { Calendar, Clock, Check, ArrowLeft, ArrowRight } from 'lucide-react'
+
+interface BusyWindow {
+  start: string
+  end: string
+}
 
 export const Route = createFileRoute('/$username')({
   beforeLoad: async ({ params }) => {
@@ -132,14 +137,37 @@ function BookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
+  const [busyWindows, setBusyWindows] = useState<BusyWindow[]>([])
   const weekDates = useMemo(() => {
     const start = weekOffset * 7
     return dates.slice(start, start + 7)
   }, [dates, weekOffset])
 
+  // Check for Google Calendar conflicts when date changes
+  useEffect(() => {
+    if (!selectedDate || !owner) return
+
+    const checkConflicts = async () => {
+      try {
+        const result = await checkGoogleCalendarConflicts({
+          data: {
+            userId: owner.uid,
+            date: selectedDate.toISOString().split('T')[0],
+          },
+        })
+        setBusyWindows(result.busyWindows)
+      } catch (error) {
+        console.error('Failed to check Google Calendar conflicts:', error)
+        setBusyWindows([]) // Fail open
+      }
+    }
+
+    checkConflicts()
+  }, [selectedDate, owner])
+
   const availableSlots = useMemo(() => {
     if (!selectedDate || !availability || !owner || availability.mode === 'soonest') return []
-    return getAvailableSlots(
+    const slots = getAvailableSlots(
       selectedDate,
       availability.windows,
       bookings,
@@ -147,7 +175,26 @@ function BookingPage() {
       owner.settings.bufferTime,
       owner.settings.minNotice
     )
-  }, [selectedDate, availability, owner, bookings])
+
+    // Filter out slots that conflict with Google Calendar busy windows
+    return slots.filter((slot) => {
+      const [sh, sm] = slot.split(':').map(Number)
+      const slotStart = sh * 60 + sm
+      const slotEnd = slotStart + owner.settings.defaultDuration
+
+      const slotStartDate = new Date(selectedDate)
+      slotStartDate.setHours(Math.floor(slotStart / 60), slotStart % 60, 0, 0)
+      const slotEndDate = new Date(selectedDate)
+      slotEndDate.setHours(Math.floor(slotEnd / 60), slotEnd % 60, 0, 0)
+
+      // Check if slot overlaps with any busy window
+      return !busyWindows.some((busy) => {
+        const busyStart = new Date(busy.start)
+        const busyEnd = new Date(busy.end)
+        return slotStartDate < busyEnd && slotEndDate > busyStart
+      })
+    })
+  }, [selectedDate, availability, owner, bookings, busyWindows])
 
   const handleBook = async () => {
     if (!owner || !selectedDate || !selectedSlot) return

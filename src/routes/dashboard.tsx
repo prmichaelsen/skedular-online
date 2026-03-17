@@ -5,7 +5,7 @@ import { CalendarPainter, type CalendarPainterValue } from '@/components/Calenda
 import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken, disconnectGoogleCalendar } from '@/lib/firestore'
 import { googleCalendarProvider } from '@/lib/calendar-providers/google'
 import type { UserProfile, Booking } from '@/lib/types'
-import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock, Link2, X } from 'lucide-react'
+import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock, Link2, X, AlertTriangle } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -166,6 +166,10 @@ function DashboardPage() {
     if (p) setProfile(p)
   }
 
+  // Check if Google Calendar connection has expired or needs attention
+  const googleCalendarNeedsAttention = profile?.google_calendar?.connected &&
+    profile.google_calendar.expires_at < Date.now()
+
   if (authLoading || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -198,6 +202,27 @@ function DashboardPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* Google Calendar disconnected banner */}
+        {googleCalendarNeedsAttention && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-900">
+                Google Calendar disconnected
+              </p>
+              <p className="text-xs text-yellow-800 mt-1">
+                Your calendar sync has expired. New bookings may conflict with your calendar events.
+              </p>
+            </div>
+            <button
+              onClick={handleConnectGoogleCalendar}
+              className="px-3 py-1.5 bg-yellow-600 text-white rounded-lg text-xs font-medium hover:bg-yellow-700 transition-colors"
+            >
+              Reconnect
+            </button>
+          </div>
+        )}
+
         {/* Booking link */}
         <div className="mb-8 p-4 bg-bg-elevated rounded-xl flex items-center justify-between">
           <div>
