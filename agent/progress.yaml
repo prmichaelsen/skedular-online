@@ -17,6 +17,16 @@ milestones:
     estimated_weeks: 1
     tasks_completed: 1
     tasks_total: 2
+  - id: M2
+    name: Calendar Sync
+    file: agent/milestones/milestone-2-calendar-sync.md
+    status: not_started
+    progress: 0
+    started: null
+    completed: null
+    estimated_weeks: 3
+    tasks_completed: 0
+    tasks_total: 3
 
 tasks:
   milestone_1:
@@ -38,12 +48,41 @@ tasks:
       completed_date: null
       dependencies:
         - task-1
+  milestone_2:
+    - id: task-3
+      name: .ics Subscription Feed Endpoint + User Settings
+      status: not_started
+      started: null
+      actual_hours: null
+      file: agent/tasks/milestone-2-calendar-sync/task-3-ics-subscription-feed.md
+      estimated_hours: 5
+      completed_date: null
+      dependencies: []
+    - id: task-4
+      name: Google Calendar OAuth Connection Flow
+      status: not_started
+      started: null
+      actual_hours: null
+      file: agent/tasks/milestone-2-calendar-sync/task-4-google-calendar-oauth.md
+      estimated_hours: 6
+      completed_date: null
+      dependencies: []
+    - id: task-5
+      name: Conflict Checking via Google Calendar FreeBusy API
+      status: not_started
+      started: null
+      actual_hours: null
+      file: agent/tasks/milestone-2-calendar-sync/task-5-conflict-checking-freebusy.md
+      estimated_hours: 5
+      completed_date: null
+      dependencies:
+        - task-4
 
 documentation:
   design_documents: 1
-  milestone_documents: 1
+  milestone_documents: 2
   pattern_documents: 48
-  task_documents: 2
+  task_documents: 5
 
 progress:
   planning: 100
@@ -51,6 +90,15 @@ progress:
   overall: 50
 
 recent_work:
+  - date: 2026-03-17
+    description: Planned M2 Calendar Sync milestone with security-first design
+    items:
+      - "📋 Created clarification-2: Calendar Sync Features (22 questions, captured)"
+      - "📋 Captured 27 design decisions across 5 categories in requirements.md"
+      - "📋 Planned M2: Calendar Sync (3 tasks, ~3 weeks)"
+      - "✅ Task 3: .ics Subscription Feed (5 hrs)"
+      - "✅ Task 4: Google Calendar OAuth (6 hrs)"
+      - "✅ Task 5: Conflict Checking FreeBusy API (5 hrs)"
   - date: 2026-03-15
     description: Built and deployed MVP, planned email infrastructure milestone
     items:
@@ -60,11 +108,12 @@ recent_work:
       - "📋 Planned M1: Email Infrastructure (2 tasks)"
 
 next_steps:
-  - Complete Task 2 — wire sendBookingConfirmation into $username.tsx booking flow
-  - Complete Task 2 — wire sendCancellationEmail into cancel.$token.tsx flow
+  - Complete M1 Task 2 — wire sendBookingConfirmation into $username.tsx booking flow
+  - Complete M1 Task 2 — wire sendCancellationEmail into cancel.$token.tsx flow
   - Fix dashboard.tsx missing imports (getAvailability, getBookingsForUser)
   - Upload MANDRILL_API_KEY as Cloudflare secret
-  - Deploy and test end-to-end
+  - Deploy M1 and test end-to-end
+  - Start M2 after M1 completion (3 tasks: .ics feed, OAuth, conflict checking)
 
 notes:
   - MVP built in ~1 hour on 2026-03-15
