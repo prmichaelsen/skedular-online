@@ -10,7 +10,17 @@ export interface UserProfile {
   ics_feed_enabled?: boolean
   ics_feed_token?: string | null
   ics_feed_token_created_at?: string | null
+  google_calendar?: GoogleCalendarConnection | null
   createdAt: string
+}
+
+export interface GoogleCalendarConnection {
+  connected: boolean
+  access_token: string
+  refresh_token: string
+  expires_at: number // Unix timestamp
+  connected_at: string // ISO timestamp
+  last_synced: string | null // ISO timestamp
 }
 
 export interface UserSettings {

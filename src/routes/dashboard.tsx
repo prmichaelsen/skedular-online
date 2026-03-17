@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { CalendarPainter, type CalendarPainterValue } from '@/components/CalendarPainter'
-import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken } from '@/lib/firestore'
+import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken, disconnectGoogleCalendar } from '@/lib/firestore'
+import { googleCalendarProvider } from '@/lib/calendar-providers/google'
 import type { UserProfile, Booking } from '@/lib/types'
-import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock } from 'lucide-react'
+import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock, Link2, X } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -148,6 +149,21 @@ function DashboardPage() {
     navigator.clipboard.writeText(calendarFeedUrl)
     setFeedCopied(true)
     setTimeout(() => setFeedCopied(false), 2000)
+  }
+
+  const handleConnectGoogleCalendar = () => {
+    if (!user) return
+    const redirectUri = `${window.location.origin}/auth/google/callback`
+    const authUrl = googleCalendarProvider.getAuthUrl(user.uid, redirectUri)
+    window.location.href = authUrl
+  }
+
+  const handleDisconnectGoogleCalendar = async () => {
+    if (!user) return
+    await disconnectGoogleCalendar(user.uid)
+    // Refresh profile
+    const p = await getUserProfile(user.uid)
+    if (p) setProfile(p)
   }
 
   if (authLoading || !profile) {
@@ -328,6 +344,54 @@ function DashboardPage() {
                     >
                       Disable Feed
                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Google Calendar sync settings */}
+            <div className="p-6 border border-border-default rounded-xl">
+              <h2 className="text-lg font-semibold mb-2">Google Calendar Sync</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                Check for conflicts with your Google Calendar events when people book time
+              </p>
+
+              {!profile?.google_calendar?.connected ? (
+                <button
+                  onClick={handleConnectGoogleCalendar}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
+                >
+                  <Link2 className="w-4 h-4" />
+                  Connect Google Calendar
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-success/5 border border-success/20 rounded-lg">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-sm text-success font-medium">Connected</span>
+                  </div>
+
+                  {profile.google_calendar.last_synced && (
+                    <p className="text-xs text-text-muted">
+                      Last synced: {new Date(profile.google_calendar.last_synced).toLocaleString()}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDisconnectGoogleCalendar}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border-default rounded-lg text-xs hover:bg-bg-elevated transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs text-blue-900">
+                      <strong>Read-only access:</strong> Skedular can only view your calendar to check for conflicts.
+                      We cannot create, modify, or delete your events.
+                    </p>
                   </div>
                 </div>
               )}

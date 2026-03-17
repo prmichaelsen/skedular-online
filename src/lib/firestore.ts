@@ -173,3 +173,47 @@ export async function regenerateCalendarFeedToken(uid: string): Promise<string> 
   })
   return token
 }
+
+// ── Google Calendar Connection ─────────────────────────────
+
+export async function saveGoogleCalendarConnection(
+  uid: string,
+  connection: {
+    access_token: string
+    refresh_token: string
+    expires_at: number
+  }
+) {
+  const db = getFirebaseDb()
+  await updateDoc(doc(db, 'users', uid), {
+    google_calendar: {
+      connected: true,
+      access_token: connection.access_token,
+      refresh_token: connection.refresh_token,
+      expires_at: connection.expires_at,
+      connected_at: new Date().toISOString(),
+      last_synced: null,
+    },
+  })
+}
+
+export async function updateGoogleCalendarTokens(
+  uid: string,
+  tokens: {
+    access_token: string
+    expires_at: number
+  }
+) {
+  const db = getFirebaseDb()
+  await updateDoc(doc(db, 'users', uid), {
+    'google_calendar.access_token': tokens.access_token,
+    'google_calendar.expires_at': tokens.expires_at,
+  })
+}
+
+export async function disconnectGoogleCalendar(uid: string) {
+  const db = getFirebaseDb()
+  await updateDoc(doc(db, 'users', uid), {
+    google_calendar: null,
+  })
+}
