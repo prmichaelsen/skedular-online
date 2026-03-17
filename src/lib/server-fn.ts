@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getFirebaseDb, doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } from './firebase-client'
+import { getFirebaseDb, doc, getDoc, collection, query, where, getDocs, addDoc } from './firebase-client'
 import { sendEmail } from './email'
 import { generateICS, toBase64 } from './ics'
 import { confirmationToBooker, confirmationToOwner, cancellationNotification } from './email-templates'
@@ -230,6 +230,117 @@ interface SendCancellationEmailInput {
   duration: number
   username: string
 }
+
+// ── Calendar Feed .ics Generation ─────────────────────
+
+interface GenerateICSFeedInput {
+  username: string
+  token: string
+}
+
+export const generateICSFeed = createServerFn({ method: 'GET' })
+  .inputValidator((input: GenerateICSFeedInput) => input)
+  .handler(async ({ data }) => {
+    const { username, token } = data
+    const db = getFirebaseDb()
+
+    // Find user by username
+    const usersRef = collection(db, 'users')
+    const userSnapshot = await getDocs(query(usersRef, where('username', '==', username.toLowerCase())))
+
+    if (userSnapshot.empty) {
+      return { success: false, error: 'User not found' }
+    }
+
+    const userDoc = userSnapshot.docs[0]
+    const userData = userDoc.data()
+
+    // Check if .ics feed is enabled
+    if (!userData.ics_feed_enabled) {
+      return { success: false, error: 'Calendar feed not enabled' }
+    }
+
+    // Validate token
+    if (userData.ics_feed_token !== token) {
+      return { success: false, error: 'Invalid token' }
+    }
+
+    // Query confirmed bookings for this user
+    const bookingsRef = collection(db, 'bookings')
+    const bookingsQuery = query(
+      bookingsRef,
+      where('userId', '==', userDoc.id),
+      where('status', '==', 'confirmed')
+    )
+    const bookingsSnapshot = await getDocs(bookingsQuery)
+
+    // Generate .ics file
+    const icsLines: string[] = []
+
+    // Calendar header
+    icsLines.push('BEGIN:VCALENDAR')
+    icsLines.push('VERSION:2.0')
+    icsLines.push('PRODID:-//Skedular//EN')
+    icsLines.push('CALSCALE:GREGORIAN')
+    icsLines.push('METHOD:PUBLISH')
+    icsLines.push(`X-WR-CALNAME:Skedular - ${username}`)
+    icsLines.push('X-WR-TIMEZONE:UTC')
+
+    // Add events
+    bookingsSnapshot.forEach((doc) => {
+      const booking = doc.data() as Booking
+
+      // Parse date and time into ISO format
+      const [year, month, day] = booking.date.split('-').map(Number)
+      const [startHour, startMin] = booking.startTime.split(':').map(Number)
+      const [endHour, endMin] = booking.endTime.split(':').map(Number)
+
+      const startDate = new Date(Date.UTC(year, month - 1, day, startHour, startMin))
+      const endDate = new Date(Date.UTC(year, month - 1, day, endHour, endMin))
+      const createdDate = booking.createdAt ? new Date(booking.createdAt) : new Date()
+
+      // Format dates for iCalendar (YYYYMMDDTHHMMSSZ)
+      const formatICalDate = (date: Date) => {
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+      }
+
+      // Escape special characters in text fields
+      const escape = (str: string) => {
+        if (!str) return ''
+        return str
+          .replace(/\\/g, '\\\\')
+          .replace(/;/g, '\\;')
+          .replace(/,/g, '\\,')
+          .replace(/\n/g, '\\n')
+      }
+
+      // Build description with cancel link
+      const baseUrl = process.env.VITE_APP_URL || 'https://skedular.online'
+      const cancelUrl = `${baseUrl}/cancel/${booking.cancelToken}`
+      const description = [
+        `Booked by ${escape(booking.bookerEmail)}`,
+        booking.notes ? `Notes: ${escape(booking.notes)}` : '',
+        '',
+        `Cancel: ${cancelUrl}`
+      ].filter(Boolean).join('\\n')
+
+      icsLines.push('BEGIN:VEVENT')
+      icsLines.push(`UID:${doc.id}@skedular.online`)
+      icsLines.push(`DTSTAMP:${formatICalDate(createdDate)}`)
+      icsLines.push(`DTSTART:${formatICalDate(startDate)}`)
+      icsLines.push(`DTEND:${formatICalDate(endDate)}`)
+      icsLines.push(`SUMMARY:Meeting with ${escape(booking.bookerName)}`)
+      icsLines.push(`DESCRIPTION:${description}`)
+      icsLines.push('STATUS:CONFIRMED')
+      icsLines.push('TRANSP:OPAQUE')
+      icsLines.push('END:VEVENT')
+    })
+
+    // Calendar footer
+    icsLines.push('END:VCALENDAR')
+
+    return { success: true, icsContent: icsLines.join('\r\n') }
+  })
 
 export const sendCancellationEmail = createServerFn({ method: 'POST' })
   .inputValidator((input: SendCancellationEmailInput) => input)

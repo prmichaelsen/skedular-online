@@ -7,6 +7,9 @@ export interface UserProfile {
   location?: string
   timezone: string
   settings: UserSettings
+  ics_feed_enabled?: boolean
+  ics_feed_token?: string | null
+  ics_feed_token_created_at?: string | null
   createdAt: string
 }
 

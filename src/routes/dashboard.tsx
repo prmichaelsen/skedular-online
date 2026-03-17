@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { CalendarPainter, type CalendarPainterValue } from '@/components/CalendarPainter'
-import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings } from '@/lib/firestore'
+import { getUserProfile, getAvailability, saveAvailability, getBookingsForUser, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken } from '@/lib/firestore'
 import type { UserProfile, Booking } from '@/lib/types'
 import { Copy, Check, Settings, LogOut, ExternalLink, Calendar, Clock } from 'lucide-react'
 
@@ -25,6 +25,9 @@ function DashboardPage() {
     maxPerDay: 0,
     minNotice: 120,
   })
+  const [calendarFeedUrl, setCalendarFeedUrl] = useState<string | null>(null)
+  const [feedCopied, setFeedCopied] = useState(false)
+  const [enablingFeed, setEnablingFeed] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/login' })
@@ -58,6 +61,11 @@ function DashboardPage() {
       const today = new Date().toISOString().split('T')[0]
       const b = await getBookingsForUser(user.uid)
       setBookings(b.filter((bk) => bk.date >= today).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)))
+
+      // Set calendar feed URL if enabled
+      if (p.ics_feed_enabled && p.ics_feed_token) {
+        setCalendarFeedUrl(`${window.location.origin}/cal/${p.username}.ics?token=${p.ics_feed_token}`)
+      }
     })()
   }, [user, navigate])
 
@@ -94,6 +102,52 @@ function DashboardPage() {
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleEnableCalendarFeed = async () => {
+    if (!user) return
+    setEnablingFeed(true)
+    try {
+      const token = await enableCalendarFeed(user.uid)
+      const feedUrl = `${window.location.origin}/cal/${profile?.username}.ics?token=${token}`
+      setCalendarFeedUrl(feedUrl)
+      // Refresh profile
+      const p = await getUserProfile(user.uid)
+      if (p) setProfile(p)
+    } finally {
+      setEnablingFeed(false)
+    }
+  }
+
+  const handleDisableCalendarFeed = async () => {
+    if (!user) return
+    await disableCalendarFeed(user.uid)
+    setCalendarFeedUrl(null)
+    // Refresh profile
+    const p = await getUserProfile(user.uid)
+    if (p) setProfile(p)
+  }
+
+  const handleRegenerateFeedToken = async () => {
+    if (!user) return
+    setEnablingFeed(true)
+    try {
+      const token = await regenerateCalendarFeedToken(user.uid)
+      const feedUrl = `${window.location.origin}/cal/${profile?.username}.ics?token=${token}`
+      setCalendarFeedUrl(feedUrl)
+      // Refresh profile
+      const p = await getUserProfile(user.uid)
+      if (p) setProfile(p)
+    } finally {
+      setEnablingFeed(false)
+    }
+  }
+
+  const copyFeedUrl = () => {
+    if (!calendarFeedUrl) return
+    navigator.clipboard.writeText(calendarFeedUrl)
+    setFeedCopied(true)
+    setTimeout(() => setFeedCopied(false), 2000)
   }
 
   if (authLoading || !profile) {
@@ -158,8 +212,10 @@ function DashboardPage() {
 
         {/* Settings panel */}
         {showSettings && (
-          <div className="mb-8 p-6 border border-border-default rounded-xl">
-            <h2 className="text-lg font-semibold mb-4">Booking settings</h2>
+          <div className="mb-8 space-y-6">
+            {/* Booking settings */}
+            <div className="p-6 border border-border-default rounded-xl">
+              <h2 className="text-lg font-semibold mb-4">Booking settings</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-text-secondary mb-1">Default duration (min)</label>
@@ -205,12 +261,77 @@ function DashboardPage() {
                 />
               </div>
             </div>
-            <button
-              onClick={handleSaveSettings}
-              className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
-            >
-              Save settings
-            </button>
+              <button
+                onClick={handleSaveSettings}
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
+              >
+                Save settings
+              </button>
+            </div>
+
+            {/* Calendar subscription settings */}
+            <div className="p-6 border border-border-default rounded-xl">
+              <h2 className="text-lg font-semibold mb-2">Calendar Subscription</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                Subscribe to your bookings in Google Calendar, Outlook, or Apple Calendar
+              </p>
+
+              {!profile?.ics_feed_enabled ? (
+                <button
+                  onClick={handleEnableCalendarFeed}
+                  disabled={enablingFeed}
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
+                >
+                  {enablingFeed ? 'Enabling...' : 'Enable Calendar Feed'}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-bg-elevated rounded-lg">
+                    <p className="text-xs text-text-secondary mb-1">Subscription URL</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={calendarFeedUrl || ''}
+                        readOnly
+                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-border-default rounded font-mono"
+                      />
+                      <button
+                        onClick={copyFeedUrl}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-white border border-border-default rounded-lg text-xs hover:bg-bg-elevated transition-colors"
+                      >
+                        {feedCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+                        {feedCopied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-text-muted space-y-1">
+                    <p className="font-medium">How to subscribe:</p>
+                    <ul className="list-disc list-inside space-y-0.5 pl-2">
+                      <li>Google Calendar: Settings → Add calendar → From URL</li>
+                      <li>Outlook: Add calendar → Subscribe from web</li>
+                      <li>Apple Calendar: File → New Calendar Subscription</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRegenerateFeedToken}
+                      disabled={enablingFeed}
+                      className="px-3 py-1.5 bg-white border border-border-default rounded-lg text-xs hover:bg-bg-elevated transition-colors disabled:opacity-50"
+                    >
+                      {enablingFeed ? 'Regenerating...' : 'Regenerate URL'}
+                    </button>
+                    <button
+                      onClick={handleDisableCalendarFeed}
+                      className="px-3 py-1.5 text-xs text-error hover:underline"
+                    >
+                      Disable Feed
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

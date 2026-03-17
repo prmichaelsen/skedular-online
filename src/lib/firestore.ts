@@ -134,3 +134,42 @@ export async function deleteBooking(bookingId: string) {
   const db = getFirebaseDb()
   await deleteDoc(doc(db, 'bookings', bookingId))
 }
+
+// ── Calendar Feed ──────────────────────────────────────────
+
+/**
+ * Generates a cryptographically secure random token for .ics feed
+ */
+function generateSecureToken(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+export async function enableCalendarFeed(uid: string): Promise<string> {
+  const db = getFirebaseDb()
+  const token = generateSecureToken()
+  await updateDoc(doc(db, 'users', uid), {
+    ics_feed_enabled: true,
+    ics_feed_token: token,
+    ics_feed_token_created_at: new Date().toISOString(),
+  })
+  return token
+}
+
+export async function disableCalendarFeed(uid: string) {
+  const db = getFirebaseDb()
+  await updateDoc(doc(db, 'users', uid), {
+    ics_feed_enabled: false,
+  })
+}
+
+export async function regenerateCalendarFeedToken(uid: string): Promise<string> {
+  const db = getFirebaseDb()
+  const token = generateSecureToken()
+  await updateDoc(doc(db, 'users', uid), {
+    ics_feed_token: token,
+    ics_feed_token_created_at: new Date().toISOString(),
+  })
+  return token
+}
