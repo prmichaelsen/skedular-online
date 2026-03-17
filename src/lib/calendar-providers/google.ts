@@ -169,8 +169,9 @@ export class GoogleCalendarProvider implements CalendarProvider {
  * Must be called with env vars from Cloudflare Worker context
  */
 export function createGoogleCalendarProvider(env: any): GoogleCalendarProvider {
-  return new GoogleCalendarProvider(
-    env.GOOGLE_CLIENT_ID,
-    env.GOOGLE_CLIENT_SECRET
-  )
+  // Prefer VITE_GOOGLE_CLIENT_ID (accessible to client), fallback to GOOGLE_CLIENT_ID
+  const clientId = env.VITE_GOOGLE_CLIENT_ID || env.GOOGLE_CLIENT_ID
+  const clientSecret = env.GOOGLE_CLIENT_SECRET
+
+  return new GoogleCalendarProvider(clientId, clientSecret)
 }

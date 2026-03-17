@@ -403,11 +403,11 @@ export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
 
     // Get env from context (Cloudflare Worker env)
     const env = (context as any)?.cloudflare?.env || {}
-    const clientId = env.GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID
+    const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
     const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
 
     if (!clientId) {
-      throw new Error('GOOGLE_CLIENT_ID not configured')
+      throw new Error('VITE_GOOGLE_CLIENT_ID not configured')
     }
 
     const provider = createGoogleCalendarProvider({
@@ -471,7 +471,7 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
       const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
 
       const env = (context as any)?.cloudflare?.env || {}
-      const clientId = env.GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID
+      const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
       const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
 
       const provider = createGoogleCalendarProvider({
