@@ -70,14 +70,17 @@ Add these secrets to your Cloudflare Workers environment:
 # Via Cloudflare Dashboard:
 # Workers & Pages → skedular → Settings → Environment Variables
 
-GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=<your-client-secret>
+GOOGLE_CLIENT_ID=905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=<your-client-secret-from-google-cloud-console>
 ```
 
 Or via `wrangler`:
 
 ```bash
-wrangler secret put GOOGLE_CLIENT_ID
+# Set client ID
+echo "905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleusercontent.com" | wrangler secret put GOOGLE_CLIENT_ID
+
+# Set client secret (paste when prompted)
 wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 

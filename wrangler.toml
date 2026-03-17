@@ -38,3 +38,7 @@ simple = { limit = 100, period = 60 }
 VITE_FIREBASE_API_KEY = "AIzaSyAkF6W-Mv5JcFg-DSwdggJJisKq49BXZJU"
 VITE_FIREBASE_AUTH_DOMAIN = "skedular-online-prod.firebaseapp.com"
 VITE_FIREBASE_PROJECT_ID = "skedular-online-prod"
+GOOGLE_CLIENT_ID = "905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleusercontent.com"
+
+# Note: GOOGLE_CLIENT_SECRET must be set as a Cloudflare secret (not here)
+# Run: wrangler secret put GOOGLE_CLIENT_SECRET

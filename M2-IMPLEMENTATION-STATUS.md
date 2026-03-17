@@ -37,10 +37,11 @@ Milestone 2 (Calendar Sync) is **85% complete**. All core functionality has been
 - [x] Graceful degradation UI (dashboard banner when expired)
 
 **Deployment requirements**:
-1. Create Google Cloud project
-2. Enable Google Calendar API
-3. Configure OAuth 2.0 credentials
-4. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Cloudflare
+1. ✅ Google Cloud project created
+2. ✅ Google Calendar API enabled
+3. ✅ OAuth 2.0 client ID configured (`905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleusercontent.com`)
+4. ✅ Client ID added to wrangler.toml
+5. ⏳ Set GOOGLE_CLIENT_SECRET in Cloudflare (requires secret from Google Cloud Console)
 
 **Missing** (non-blocking):
 - [ ] Proactive token refresh cron job (tokens expire after 1 hour)
@@ -65,8 +66,10 @@ Milestone 2 (Calendar Sync) is **85% complete**. All core functionality has been
 
 ### High Priority (Production Blockers)
 
-**Google OAuth Setup** (15 minutes)
-- [ ] Follow GOOGLE-OAUTH-SETUP.md steps 1-4
+**Google OAuth Setup** (5-10 minutes)
+- [x] Client ID configured in wrangler.toml
+- [ ] Set GOOGLE_CLIENT_SECRET as Cloudflare secret
+- [ ] Verify OAuth redirect URI in Google Cloud Console: `https://skedular.online/auth/google/callback`
 - [ ] Test OAuth flow end-to-end
 - [ ] Verify conflict checking works with real events
 
@@ -194,8 +197,17 @@ Milestone 2 (Calendar Sync) is **85% complete**. All core functionality has been
 
 ### Environment Variables Required
 ```bash
-GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=<your-client-secret>
+# Already configured in wrangler.toml
+GOOGLE_CLIENT_ID=905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleusercontent.com
+
+# Needs to be set as Cloudflare secret
+GOOGLE_CLIENT_SECRET=<get-from-google-cloud-console>
+```
+
+**To set the client secret:**
+```bash
+wrangler secret put GOOGLE_CLIENT_SECRET
+# Paste the secret when prompted
 ```
 
 ---
