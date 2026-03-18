@@ -14,7 +14,7 @@ export default {
       const error = url.searchParams.get('error')
 
       // Build redirect URL with query params preserved
-      const dashboardUrl = new URL('/dashboard', url.origin)
+      const dashboardUrl = new URL('/dashboard/settings', url.origin)
 
       if (error) {
         dashboardUrl.searchParams.set('oauth_error', 'cancelled')
