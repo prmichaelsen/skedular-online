@@ -382,10 +382,25 @@ function SettingsPage() {
               </button>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-success/5 border border-success/20 rounded-lg">
-                  <Check className="w-4 h-4 text-success" />
-                  <span className="text-sm text-success font-medium">Connected</span>
-                </div>
+                {profile.google_calendar.expires_at && profile.google_calendar.expires_at < Date.now() ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <span className="text-sm text-yellow-800 font-medium">Token expired - reconnect to restore sync</span>
+                    </div>
+                    <button
+                      onClick={handleConnectGoogleCalendar}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Reconnect Google Calendar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 bg-success/5 border border-success/20 rounded-lg">
+                    <Check className="w-4 h-4 text-success" />
+                    <span className="text-sm text-success font-medium">Connected</span>
+                  </div>
+                )}
 
                 {profile.google_calendar.last_synced && (
                   <p className="text-xs text-text-muted">

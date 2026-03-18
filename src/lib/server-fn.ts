@@ -422,6 +422,52 @@ export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
     return { authUrl }
   })
 
+// ── Google Calendar Helpers ────────────────────────────────
+
+/**
+ * Ensure Google Calendar access token is valid, refreshing if expired.
+ * Returns the valid access token or null if refresh fails.
+ */
+async function ensureValidGoogleToken(
+  googleCalendar: any,
+  userId: string,
+  env: any
+): Promise<string | null> {
+  if (googleCalendar.expires_at > Date.now()) {
+    return googleCalendar.access_token
+  }
+
+  // Token expired - try to refresh
+  console.log(`Refreshing expired Google Calendar token for user ${userId}`)
+  try {
+    const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
+    const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
+    const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
+    const provider = createGoogleCalendarProvider({
+      GOOGLE_CLIENT_ID: clientId,
+      GOOGLE_CLIENT_SECRET: clientSecret,
+    })
+
+    const newTokens = await provider.refreshToken(googleCalendar.refresh_token)
+
+    // Save refreshed tokens using admin SDK
+    const { updateDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
+    const serviceAccount = (await import('../../skedular-prod-service.json')).default
+    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
+
+    await updateDocument('users', userId, {
+      'google_calendar.access_token': newTokens.access_token,
+      'google_calendar.expires_at': newTokens.expires_at,
+    })
+
+    console.log(`Successfully refreshed token for user ${userId}`)
+    return newTokens.access_token
+  } catch (error) {
+    console.error(`Failed to refresh token for user ${userId}:`, error)
+    return null
+  }
+}
+
 // ── Google Calendar Conflict Checking ─────────────────────
 
 interface CheckConflictsInput {
@@ -454,11 +500,10 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
       return { connected: false, busyWindows: [] }
     }
 
-    // Check if token is expired (should be refreshed proactively, but handle here too)
-    if (googleCalendar.expires_at < Date.now()) {
-      // Token expired - return disconnected (graceful degradation)
-      // TODO: In production, this should trigger a token refresh attempt
-      console.warn(`Google Calendar token expired for user ${data.userId}`)
+    // Ensure token is valid, refreshing if needed
+    const env = (context as any)?.cloudflare?.env || {}
+    const accessToken = await ensureValidGoogleToken(googleCalendar, data.userId, env)
+    if (!accessToken) {
       return { connected: false, busyWindows: [] }
     }
 
@@ -477,8 +522,6 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
 
       // Query Google Calendar FreeBusy API
       const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
-
-      const env = (context as any)?.cloudflare?.env || {}
       const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
       const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
 
@@ -487,7 +530,7 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
         GOOGLE_CLIENT_SECRET: clientSecret,
       })
 
-      const busyWindows = await provider.checkConflicts(googleCalendar.access_token, {
+      const busyWindows = await provider.checkConflicts(accessToken, {
         start: startDate,
         end: endDate,
       })
@@ -536,8 +579,11 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
       return { connected: false, events: [], error: 'Google Calendar not connected' }
     }
 
-    if (googleCalendar.expires_at < Date.now()) {
-      return { connected: false, events: [], error: 'Token expired' }
+    // Ensure token is valid, refreshing if needed
+    const env = (context as any)?.cloudflare?.env || {}
+    const accessToken = await ensureValidGoogleToken(googleCalendar, data.userId, env)
+    if (!accessToken) {
+      return { connected: false, events: [], error: 'Token expired and refresh failed' }
     }
 
     try {
@@ -550,7 +596,7 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
 
       // Get list of calendars
       const calendarsResponse = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
-        headers: { Authorization: `Bearer ${googleCalendar.access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
 
       if (!calendarsResponse.ok) {
@@ -572,7 +618,7 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
 
         const eventsResponse = await fetch(
           `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?${params}`,
-          { headers: { Authorization: `Bearer ${googleCalendar.access_token}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         )
 
         if (!eventsResponse.ok) continue

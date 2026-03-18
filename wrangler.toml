@@ -43,3 +43,7 @@ GOOGLE_CLIENT_ID = "905143636635-gv0bts2o095qr4hp4bj9t6ll9culcl3b.apps.googleuse
 
 # Note: GOOGLE_CLIENT_SECRET must be set as a Cloudflare secret (not here)
 # Run: wrangler secret put GOOGLE_CLIENT_SECRET
+
+# Cron trigger: refresh Google Calendar tokens every hour
+[triggers]
+crons = ["0 * * * *"]
