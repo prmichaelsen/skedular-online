@@ -125,7 +125,11 @@ export class GoogleCalendarProvider implements CalendarProvider {
     }
 
     const calendarsData = await calendarsResponse.json()
-    const calendarIds = calendarsData.items.map((cal: any) => ({ id: cal.id }))
+    // Only check calendars the user owns or can write to
+    // This excludes Holidays, Birthdays, and other subscribed read-only calendars
+    const calendarIds = calendarsData.items
+      .filter((cal: any) => cal.accessRole === 'owner' || cal.accessRole === 'writer')
+      .map((cal: any) => ({ id: cal.id }))
 
     // Query FreeBusy API for all calendars
     const freeBusyResponse = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
