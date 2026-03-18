@@ -1,9 +1,29 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getFirebaseDb, doc, getDoc, collection, query, where, getDocs, addDoc } from './firebase-client'
+import {
+  initializeApp,
+  getDocument,
+  queryDocuments,
+  addDocument,
+  updateDocument,
+} from '@prmichaelsen/firebase-admin-sdk-v8'
+import serviceAccount from '../../skedular-prod-service.json'
 import { sendEmail } from './email'
 import { generateICS, toBase64 } from './ics'
 import { confirmationToBooker, confirmationToOwner, cancellationNotification } from './email-templates'
 import type { UserProfile, Availability, Booking } from './types'
+
+// ── Admin SDK Initialization ─────────────────────────────
+
+let adminInitialized = false
+function ensureAdminInitialized() {
+  if (!adminInitialized) {
+    initializeApp({
+      serviceAccount: serviceAccount as any,
+      projectId: serviceAccount.project_id,
+    })
+    adminInitialized = true
+  }
+}
 
 // ── SSR Data Preload Functions ─────────────────────────
 
@@ -12,30 +32,31 @@ export async function fetchBookingPageData(username: string): Promise<{
   availability: Availability | null
   bookings: Booking[]
 }> {
-  const db = getFirebaseDb()
+  ensureAdminInitialized()
 
-  const usersQuery = query(collection(db, 'users'), where('username', '==', username.toLowerCase()))
-  const usersSnap = await getDocs(usersQuery)
-  if (usersSnap.empty) {
+  const userDocs = await queryDocuments('users', {
+    where: [{ field: 'username', op: '==', value: username.toLowerCase() }],
+  })
+  if (userDocs.length === 0) {
     return { owner: null, availability: null, bookings: [] }
   }
-  const owner = usersSnap.docs[0].data() as UserProfile
+  const owner = { uid: userDocs[0].id, ...userDocs[0].data } as UserProfile
 
-  const [availSnap, bookingsSnap] = await Promise.all([
-    getDoc(doc(db, 'availability', owner.uid)),
-    getDocs(
-      query(
-        collection(db, 'bookings'),
-        where('userId', '==', owner.uid),
-        where('status', '==', 'confirmed')
-      )
-    ),
+  const [availability, bookingDocs] = await Promise.all([
+    getDocument('availability', owner.uid),
+    queryDocuments('bookings', {
+      where: [
+        { field: 'userId', op: '==', value: owner.uid },
+        { field: 'status', op: '==', value: 'confirmed' },
+      ],
+    }),
   ])
 
-  const availability = availSnap.exists() ? (availSnap.data() as Availability) : null
-  const bookings = bookingsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Booking)
-
-  return { owner, availability, bookings }
+  return {
+    owner,
+    availability: availability as Availability | null,
+    bookings: bookingDocs.map((d) => ({ id: d.id, ...d.data }) as Booking),
+  }
 }
 
 export async function fetchDashboardData(uid: string): Promise<{
@@ -43,28 +64,25 @@ export async function fetchDashboardData(uid: string): Promise<{
   availability: Availability | null
   bookings: Booking[]
 }> {
-  const db = getFirebaseDb()
+  ensureAdminInitialized()
 
-  const [profileSnap, availSnap, bookingsSnap] = await Promise.all([
-    getDoc(doc(db, 'users', uid)),
-    getDoc(doc(db, 'availability', uid)),
-    getDocs(
-      query(
-        collection(db, 'bookings'),
-        where('userId', '==', uid),
-        where('status', '==', 'confirmed')
-      )
-    ),
+  const [profile, availability, bookingDocs] = await Promise.all([
+    getDocument('users', uid),
+    getDocument('availability', uid),
+    queryDocuments('bookings', {
+      where: [
+        { field: 'userId', op: '==', value: uid },
+        { field: 'status', op: '==', value: 'confirmed' },
+      ],
+    }),
   ])
 
-  const profile = profileSnap.exists() ? (profileSnap.data() as UserProfile) : null
-  const availability = availSnap.exists() ? (availSnap.data() as Availability) : null
-  const bookings = bookingsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Booking)
-
-  return { profile, availability, bookings }
+  return {
+    profile: profile as UserProfile | null,
+    availability: availability as Availability | null,
+    bookings: bookingDocs.map((d) => ({ id: d.id, ...d.data }) as Booking),
+  }
 }
-
-// ── Email Server Functions ─────────────────────────────
 
 // ── Server-Side Booking with Conflict Check ───────────
 
@@ -84,17 +102,16 @@ interface CreateBookingInput {
 export const createBookingWithConflictCheck = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateBookingInput) => input)
   .handler(async ({ data }): Promise<{ success: true; bookingId: string } | { success: false; error: string; code: number }> => {
-    const db = getFirebaseDb()
+    ensureAdminInitialized()
 
     // Check for conflicts
-    const bookingsSnap = await getDocs(
-      query(
-        collection(db, 'bookings'),
-        where('userId', '==', data.userId),
-        where('date', '==', data.date),
-        where('status', '==', 'confirmed')
-      )
-    )
+    const existingBookings = await queryDocuments('bookings', {
+      where: [
+        { field: 'userId', op: '==', value: data.userId },
+        { field: 'date', op: '==', value: data.date },
+        { field: 'status', op: '==', value: 'confirmed' },
+      ],
+    })
 
     const [sh, sm] = data.startTime.split(':').map(Number)
     const [eh, em] = data.endTime.split(':').map(Number)
@@ -102,8 +119,8 @@ export const createBookingWithConflictCheck = createServerFn({ method: 'POST' })
     const newEnd = eh * 60 + em
     const buffer = data.bufferTime
 
-    for (const doc of bookingsSnap.docs) {
-      const existing = doc.data() as Booking
+    for (const doc of existingBookings) {
+      const existing = doc.data as Booking
       const [bsh, bsm] = existing.startTime.split(':').map(Number)
       const [beh, bem] = existing.endTime.split(':').map(Number)
       const existingStart = bsh * 60 + bsm
@@ -115,7 +132,7 @@ export const createBookingWithConflictCheck = createServerFn({ method: 'POST' })
     }
 
     // No conflict — create the booking
-    const ref = await addDoc(collection(db, 'bookings'), {
+    const ref = await addDocument('bookings', {
       userId: data.userId,
       bookerEmail: data.bookerEmail,
       bookerName: data.bookerName,
@@ -162,7 +179,7 @@ export const sendBookingConfirmation = createServerFn({ method: 'POST' })
     const baseUrl = 'https://skedular.online'
     const cancelUrl = `${baseUrl}/cancel/${data.cancelToken}`
     const bookingPageUrl = `${baseUrl}/${data.username}`
-    const fromEmail = 'bookings@skedular.online'
+    const fromEmail = 'support@skedular.online'
 
     const icsContent = generateICS({
       title: `Meeting: ${data.ownerName} & ${data.bookerName}`,
@@ -241,19 +258,20 @@ interface GenerateICSFeedInput {
 export const generateICSFeed = createServerFn({ method: 'GET' })
   .inputValidator((input: GenerateICSFeedInput) => input)
   .handler(async ({ data }) => {
+    ensureAdminInitialized()
     const { username, token } = data
-    const db = getFirebaseDb()
 
     // Find user by username
-    const usersRef = collection(db, 'users')
-    const userSnapshot = await getDocs(query(usersRef, where('username', '==', username.toLowerCase())))
+    const userDocs = await queryDocuments('users', {
+      where: [{ field: 'username', op: '==', value: username.toLowerCase() }],
+    })
 
-    if (userSnapshot.empty) {
+    if (userDocs.length === 0) {
       return { success: false, error: 'User not found' }
     }
 
-    const userDoc = userSnapshot.docs[0]
-    const userData = userDoc.data()
+    const userDoc = userDocs[0]
+    const userData = userDoc.data
 
     // Check if .ics feed is enabled
     if (!userData.ics_feed_enabled) {
@@ -266,13 +284,12 @@ export const generateICSFeed = createServerFn({ method: 'GET' })
     }
 
     // Query confirmed bookings for this user
-    const bookingsRef = collection(db, 'bookings')
-    const bookingsQuery = query(
-      bookingsRef,
-      where('userId', '==', userDoc.id),
-      where('status', '==', 'confirmed')
-    )
-    const bookingsSnapshot = await getDocs(bookingsQuery)
+    const bookingDocs = await queryDocuments('bookings', {
+      where: [
+        { field: 'userId', op: '==', value: userDoc.id },
+        { field: 'status', op: '==', value: 'confirmed' },
+      ],
+    })
 
     // Generate .ics file
     const icsLines: string[] = []
@@ -287,8 +304,8 @@ export const generateICSFeed = createServerFn({ method: 'GET' })
     icsLines.push('X-WR-TIMEZONE:UTC')
 
     // Add events
-    bookingsSnapshot.forEach((doc) => {
-      const booking = doc.data() as Booking
+    for (const doc of bookingDocs) {
+      const booking = doc.data as Booking
 
       // Parse date and time into ISO format
       const [year, month, day] = booking.date.split('-').map(Number)
@@ -334,7 +351,7 @@ export const generateICSFeed = createServerFn({ method: 'GET' })
       icsLines.push('STATUS:CONFIRMED')
       icsLines.push('TRANSP:OPAQUE')
       icsLines.push('END:VEVENT')
-    })
+    }
 
     // Calendar footer
     icsLines.push('END:VCALENDAR')
@@ -354,7 +371,7 @@ export const sendCancellationEmail = createServerFn({ method: 'POST' })
 
     const baseUrl = 'https://skedular.online'
     const bookingPageUrl = `${baseUrl}/${data.username}`
-    const fromEmail = 'bookings@skedular.online'
+    const fromEmail = 'support@skedular.online'
 
     const baseDetails = {
       ownerName: data.ownerName,
@@ -401,7 +418,6 @@ export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }): Promise<{ authUrl: string }> => {
     const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
 
-    // Get env from context (Cloudflare Worker env)
     const env = (context as any)?.cloudflare?.env || {}
     const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
     const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
@@ -424,10 +440,6 @@ export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
 
 // ── Google Calendar Helpers ────────────────────────────────
 
-/**
- * Ensure Google Calendar access token is valid, refreshing if expired.
- * Returns the valid access token or null if refresh fails.
- */
 async function ensureValidGoogleToken(
   googleCalendar: any,
   userId: string,
@@ -437,7 +449,6 @@ async function ensureValidGoogleToken(
     return googleCalendar.access_token
   }
 
-  // Token expired - try to refresh
   console.log(`Refreshing expired Google Calendar token for user ${userId}`)
   try {
     const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
@@ -450,11 +461,7 @@ async function ensureValidGoogleToken(
 
     const newTokens = await provider.refreshToken(googleCalendar.refresh_token)
 
-    // Save refreshed tokens using admin SDK
-    const { updateDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
-    const serviceAccount = (await import('../../skedular-prod-service.json')).default
-    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
-
+    ensureAdminInitialized()
     await updateDocument('users', userId, {
       'google_calendar.access_token': newTokens.access_token,
       'google_calendar.expires_at': newTokens.expires_at,
@@ -483,11 +490,8 @@ interface BusyWindow {
 export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
   .inputValidator((input: CheckConflictsInput) => input)
   .handler(async ({ data, context }): Promise<{ connected: boolean; busyWindows: BusyWindow[] }> => {
-    const { getDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
-    const serviceAccount = (await import('../../skedular-prod-service.json')).default
-    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
+    ensureAdminInitialized()
 
-    // Get user's Google Calendar connection
     const userData = await getDocument('users', data.userId)
     if (!userData) {
       return { connected: false, busyWindows: [] }
@@ -495,12 +499,10 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
 
     const googleCalendar = userData.google_calendar as any
 
-    // Check if Google Calendar is connected
     if (!googleCalendar || !googleCalendar.connected) {
       return { connected: false, busyWindows: [] }
     }
 
-    // Ensure token is valid, refreshing if needed
     const env = (context as any)?.cloudflare?.env || {}
     const accessToken = await ensureValidGoogleToken(googleCalendar, data.userId, env)
     if (!accessToken) {
@@ -508,9 +510,6 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
     }
 
     try {
-      // Parse date and create time range for the full day
-      // Query from start of previous day to end of next day (UTC) to catch all events
-      // that might fall on the target date in any timezone (max UTC offset is ±14 hours)
       const [year, month, day] = data.date.split('-').map(Number)
       const targetDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
       const startDate = new Date(targetDate)
@@ -520,7 +519,6 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
       endDate.setUTCDate(endDate.getUTCDate() + 1)
       endDate.setUTCHours(23, 59, 59, 999)
 
-      // Query Google Calendar FreeBusy API
       const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
       const clientId = env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID
       const clientSecret = env.GOOGLE_CLIENT_SECRET || import.meta.env.GOOGLE_CLIENT_SECRET
@@ -535,10 +533,8 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
         end: endDate,
       })
 
-      // Apply buffer time to busy windows
       const bufferMs = ((userData.settings as any)?.bufferTime || 0) * 60 * 1000
 
-      // Convert Date objects to ISO strings for JSON serialization
       return {
         connected: true,
         busyWindows: busyWindows.map((window) => ({
@@ -547,7 +543,6 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
         })),
       }
     } catch (error) {
-      // Fail open - if conflict checking fails, allow bookings to proceed
       console.error('Google Calendar conflict check failed:', error)
       return { connected: false, busyWindows: [] }
     }
@@ -568,9 +563,7 @@ interface CalendarEvent {
 export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
   .inputValidator((input: { userId: string; date: string }) => input)
   .handler(async ({ data, context }): Promise<{ connected: boolean; events: CalendarEvent[]; error?: string }> => {
-    const { getDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
-    const serviceAccount = (await import('../../skedular-prod-service.json')).default
-    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
+    ensureAdminInitialized()
 
     const userData = await getDocument('users', data.userId)
     if (!userData) {
@@ -582,7 +575,6 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
       return { connected: false, events: [], error: 'Google Calendar not connected' }
     }
 
-    // Ensure token is valid, refreshing if needed
     const env = (context as any)?.cloudflare?.env || {}
     const accessToken = await ensureValidGoogleToken(googleCalendar, data.userId, env)
     if (!accessToken) {
@@ -597,7 +589,6 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
       const endDate = new Date(targetDate)
       endDate.setUTCDate(endDate.getUTCDate() + 2)
 
-      // Get list of calendars
       const calendarsResponse = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
@@ -610,7 +601,6 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
       const calendarsData = await calendarsResponse.json() as any
       const events: CalendarEvent[] = []
 
-      // Fetch events from each calendar
       for (const cal of calendarsData.items) {
         const params = new URLSearchParams({
           timeMin: startDate.toISOString(),
@@ -639,7 +629,6 @@ export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
         }
       }
 
-      // Sort by start time
       events.sort((a, b) => a.start.localeCompare(b.start))
 
       return { connected: true, events }

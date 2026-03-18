@@ -103,7 +103,7 @@ export default {
   },
 
   // Cron trigger: refresh Google Calendar tokens for all connected users
-  async scheduled(event: any, env: any, ctx: any) {
+  async scheduled(_event: any, env: any, _ctx: any) {
     console.log('Cron: Refreshing Google Calendar tokens...')
 
     try {
@@ -112,9 +112,9 @@ export default {
       try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
 
       // Find all users with connected Google Calendar
-      const users = await queryDocuments('users', [
-        { field: 'google_calendar.connected', op: '==', value: true },
-      ])
+      const users = await queryDocuments('users', {
+        where: [{ field: 'google_calendar.connected', op: '==', value: true }],
+      })
 
       if (!users || users.length === 0) {
         console.log('Cron: No users with connected Google Calendar')
@@ -126,7 +126,7 @@ export default {
       let failed = 0
 
       for (const user of users) {
-        const gc = user.google_calendar as any
+        const gc = (user.data as any).google_calendar
         if (!gc?.refresh_token) continue
 
         // Refresh if token expires within the next 30 minutes
@@ -135,13 +135,13 @@ export default {
 
         try {
           const newTokens = await provider.refreshToken(gc.refresh_token)
-          await updateDocument('users', user.uid as string, {
+          await updateDocument('users', user.id, {
             'google_calendar.access_token': newTokens.access_token,
             'google_calendar.expires_at': newTokens.expires_at,
           })
           refreshed++
         } catch (err) {
-          console.error(`Cron: Failed to refresh token for user ${user.uid}:`, err)
+          console.error(`Cron: Failed to refresh token for user ${user.id}:`, err)
           failed++
         }
       }

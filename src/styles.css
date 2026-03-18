@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Prevent iOS Safari zoom on focus — enforce 16px minimum */
+input, select, textarea {
+  font-size: 16px;
+}
+
 @theme {
   --color-primary: #3B82F6;
   --color-primary-dark: #2563EB;

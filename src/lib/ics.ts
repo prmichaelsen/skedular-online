@@ -17,11 +17,20 @@ interface ICSEvent {
   location?: string
 }
 
-function formatICSDate(date: string, time: string): string {
-  // Format: YYYYMMDDTHHMMSS
-  const [y, m, d] = date.split('-')
-  const [h, min] = time.split(':')
-  return `${y}${m}${d}T${h}${min}00`
+/**
+ * Convert a local date/time in a given IANA timezone to a UTC Date object.
+ * Works in Cloudflare Workers (V8 runtime with UTC system timezone).
+ */
+function localToUTC(dateStr: string, timeStr: string, timezone: string): Date {
+  const refDate = new Date(`${dateStr}T${timeStr}:00Z`)
+  const utcStr = refDate.toLocaleString('en-US', { timeZone: 'UTC' })
+  const tzStr = refDate.toLocaleString('en-US', { timeZone: timezone })
+  const offset = new Date(utcStr).getTime() - new Date(tzStr).getTime()
+  return new Date(refDate.getTime() + offset)
+}
+
+function formatUTCDate(date: Date): string {
+  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')
 }
 
 function escapeICS(text: string): string {
@@ -34,22 +43,23 @@ function escapeICS(text: string): string {
 export function generateICS(event: ICSEvent): string {
   const uid = event.uid || `${Date.now()}-${Math.random().toString(36).slice(2)}@skedular.online`
   const now = new Date()
-  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')
+  const stamp = formatUTCDate(now)
+
+  const startUTC = localToUTC(event.startDate, event.startTime, event.timezone)
+  const endUTC = localToUTC(event.startDate, event.endTime, event.timezone)
 
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Skedular//Booking//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:REQUEST',
+    'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${stamp}`,
-    `DTSTART;TZID=${event.timezone}:${formatICSDate(event.startDate, event.startTime)}`,
-    `DTEND;TZID=${event.timezone}:${formatICSDate(event.startDate, event.endTime)}`,
+    `DTSTART:${formatUTCDate(startUTC)}`,
+    `DTEND:${formatUTCDate(endUTC)}`,
     `SUMMARY:${escapeICS(event.title)}`,
-    `ORGANIZER;CN=${escapeICS(event.organizerName)}:mailto:${event.organizerEmail}`,
-    `ATTENDEE;CN=${escapeICS(event.attendeeName)};RSVP=TRUE:mailto:${event.attendeeEmail}`,
   ]
 
   if (event.description) {

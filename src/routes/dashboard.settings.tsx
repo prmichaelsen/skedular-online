@@ -325,7 +325,7 @@ function SettingsPage() {
                       type="text"
                       value={calendarFeedUrl || ''}
                       readOnly
-                      className="flex-1 px-3 py-1.5 text-xs bg-white border border-border-default rounded font-mono"
+                      className="flex-1 px-3 py-1.5 bg-white border border-border-default rounded font-mono"
                     />
                     <button
                       onClick={copyFeedUrl}

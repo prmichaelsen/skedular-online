@@ -411,7 +411,7 @@ function BookingPage() {
                         required
                         value={bookerName}
                         onChange={(e) => setBookerName(e.target.value)}
-                        className="w-full px-3 py-2 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                       <input
                         type="email"
@@ -419,14 +419,14 @@ function BookingPage() {
                         required
                         value={bookerEmail}
                         onChange={(e) => setBookerEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
                       />
                       <textarea
                         placeholder="Notes (optional)"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                        className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                       />
                       <button
                         onClick={handleBook}
