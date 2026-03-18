@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth-context'
 import { getUserProfile, updateUserSettings, enableCalendarFeed, disableCalendarFeed, regenerateCalendarFeedToken, disconnectGoogleCalendar } from '@/lib/firestore'
 import { getGoogleCalendarOAuthUrl } from '@/lib/server-fn'
 import type { UserProfile } from '@/lib/types'
-import { Copy, Check, ArrowLeft, Link2, X, LogOut } from 'lucide-react'
+import { Copy, Check, ArrowLeft, Link2, X } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/settings')({
   component: SettingsPage,
@@ -175,22 +175,7 @@ function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-        <Link to="/" className="text-xl font-bold text-primary">Skedular</Link>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={logout}
-            className="p-2 text-text-secondary hover:text-text-primary transition-colors"
-            title="Log out"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Back to dashboard */}
         <Link
           to="/dashboard"
@@ -390,6 +375,5 @@ function SettingsPage() {
           </div>
         </div>
       </div>
-    </div>
   )
 }
