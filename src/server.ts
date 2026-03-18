@@ -1,7 +1,7 @@
 import startServer from '@tanstack/react-start/server-entry'
 import { generateICSFeed } from './lib/server-fn'
 import { createGoogleCalendarProvider } from './lib/calendar-providers/google'
-import { saveGoogleCalendarConnection } from './lib/firestore'
+import { saveGoogleCalendarConnectionAdmin } from './lib/firebase-admin'
 
 export default {
   async fetch(request: Request, env: any, ctx: unknown) {
@@ -34,7 +34,7 @@ export default {
         const provider = createGoogleCalendarProvider(env)
         const tokens = await provider.handleCallback(code, userId, redirectUri)
 
-        await saveGoogleCalendarConnection(userId, {
+        await saveGoogleCalendarConnectionAdmin(userId, {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           expires_at: tokens.expires_at,

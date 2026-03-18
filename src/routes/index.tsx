@@ -97,6 +97,14 @@ function LandingPage() {
 
       {/* Footer */}
       <footer className="px-6 py-8 text-center text-text-muted text-sm">
+        <div className="flex justify-center gap-6 mb-4">
+          <Link to="/privacy" className="hover:text-text-primary transition-colors">
+            Privacy
+          </Link>
+          <Link to="/terms" className="hover:text-text-primary transition-colors">
+            Terms
+          </Link>
+        </div>
         <p>&copy; {new Date().getFullYear()} Skedular. Built by Patrick Michaelsen.</p>
       </footer>
     </div>

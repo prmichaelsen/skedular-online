@@ -71,99 +71,113 @@ function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <Link to="/" className="text-2xl font-bold text-primary">
-            Skedular
-          </Link>
-          <p className="text-text-secondary mt-2">Create your free account</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">
-              Full name
-            </label>
-            <input
-              id="name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-            />
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <Link to="/" className="text-2xl font-bold text-primary">
+              Skedular
+            </Link>
+            <p className="text-text-secondary mt-2">Create your free account</p>
           </div>
 
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-text-primary mb-1">
-              Username
-            </label>
-            <div className="flex items-center">
-              <span className="text-text-muted text-sm mr-1">skedular.com/</span>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">
+                Full name
+              </label>
               <input
-                id="username"
+                id="name"
                 type="text"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                className="flex-1 px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                placeholder="yourname"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-            />
-          </div>
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-text-primary mb-1">
+                Username
+              </label>
+              <div className="flex items-center">
+                <span className="text-text-muted text-sm mr-1">skedular.com/</span>
+                <input
+                  id="username"
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  className="flex-1 px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+                  placeholder="yourname"
+                />
+              </div>
+            </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-            />
-          </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+              />
+            </div>
 
-          <p className="text-center text-sm text-text-secondary">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:text-primary-dark">
-              Log in
-            </Link>
-          </p>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Creating account...' : 'Create account'}
+            </button>
+
+            <p className="text-center text-sm text-text-secondary">
+              Already have an account?{' '}
+              <Link to="/login" className="text-primary hover:text-primary-dark">
+                Log in
+              </Link>
+            </p>
+          </form>
+        </div>
       </div>
+
+      <footer className="px-6 py-8 text-center text-text-muted text-sm">
+        <div className="flex justify-center gap-6 mb-4">
+          <Link to="/privacy" className="hover:text-text-primary transition-colors">
+            Privacy
+          </Link>
+          <Link to="/terms" className="hover:text-text-primary transition-colors">
+            Terms
+          </Link>
+        </div>
+        <p>&copy; {new Date().getFullYear()} Skedular. Built by Patrick Michaelsen.</p>
+      </footer>
     </div>
   )
 }
