@@ -15,7 +15,7 @@ function getHostUrl(): string {
   // In production, use the actual host from window.location
   // In development/build, fall back to the configured URL
   if (typeof window !== 'undefined') {
-    const origin = getHostUrl()
+    const origin = window.location.origin
     // Only use window.location if it's not localhost (production)
     if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
       return origin
