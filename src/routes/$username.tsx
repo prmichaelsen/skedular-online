@@ -187,11 +187,10 @@ function BookingPage() {
       const slotEndDate = new Date(selectedDate)
       slotEndDate.setHours(Math.floor(slotEnd / 60), slotEnd % 60, 0, 0)
 
-      // Check if slot overlaps with any busy window (including buffer time)
-      const bufferMs = owner.settings.bufferTime * 60 * 1000
+      // Check if slot overlaps with any busy window (buffer already applied server-side)
       return !busyWindows.some((busy) => {
-        const busyStart = new Date(new Date(busy.start).getTime() - bufferMs)
-        const busyEnd = new Date(new Date(busy.end).getTime() + bufferMs)
+        const busyStart = new Date(busy.start)
+        const busyEnd = new Date(busy.end)
         return slotStartDate < busyEnd && slotEndDate > busyStart
       })
     })

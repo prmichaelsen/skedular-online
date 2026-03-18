@@ -535,12 +535,15 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
         end: endDate,
       })
 
+      // Apply buffer time to busy windows
+      const bufferMs = ((userData.settings as any)?.bufferTime || 0) * 60 * 1000
+
       // Convert Date objects to ISO strings for JSON serialization
       return {
         connected: true,
         busyWindows: busyWindows.map((window) => ({
-          start: window.start.toISOString(),
-          end: window.end.toISOString(),
+          start: new Date(window.start.getTime() - bufferMs).toISOString(),
+          end: new Date(window.end.getTime() + bufferMs).toISOString(),
         })),
       }
     } catch (error) {
