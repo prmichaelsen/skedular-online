@@ -507,3 +507,96 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
     }
   }
 )
+
+// ── Google Calendar Events (Debug) ────────────────────────
+
+interface CalendarEvent {
+  id: string
+  summary: string
+  start: string
+  end: string
+  status: string
+  calendarId: string
+}
+
+export const getGoogleCalendarEvents = createServerFn({ method: 'POST' })
+  .inputValidator((input: { userId: string; date: string }) => input)
+  .handler(async ({ data, context }): Promise<{ connected: boolean; events: CalendarEvent[]; error?: string }> => {
+    const { getDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
+    const serviceAccount = (await import('../../skedular-prod-service.json')).default
+    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
+
+    const userData = await getDocument('users', data.userId)
+    if (!userData) {
+      return { connected: false, events: [], error: 'User not found' }
+    }
+
+    const googleCalendar = userData.google_calendar as any
+    if (!googleCalendar || !googleCalendar.connected) {
+      return { connected: false, events: [], error: 'Google Calendar not connected' }
+    }
+
+    if (googleCalendar.expires_at < Date.now()) {
+      return { connected: false, events: [], error: 'Token expired' }
+    }
+
+    try {
+      const [year, month, day] = data.date.split('-').map(Number)
+      const targetDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+      const startDate = new Date(targetDate)
+      startDate.setUTCDate(startDate.getUTCDate() - 1)
+      const endDate = new Date(targetDate)
+      endDate.setUTCDate(endDate.getUTCDate() + 2)
+
+      // Get list of calendars
+      const calendarsResponse = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+        headers: { Authorization: `Bearer ${googleCalendar.access_token}` },
+      })
+
+      if (!calendarsResponse.ok) {
+        const err = await calendarsResponse.text()
+        return { connected: true, events: [], error: `Failed to list calendars: ${err}` }
+      }
+
+      const calendarsData = await calendarsResponse.json() as any
+      const events: CalendarEvent[] = []
+
+      // Fetch events from each calendar
+      for (const cal of calendarsData.items) {
+        const params = new URLSearchParams({
+          timeMin: startDate.toISOString(),
+          timeMax: endDate.toISOString(),
+          singleEvents: 'true',
+          orderBy: 'startTime',
+        })
+
+        const eventsResponse = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?${params}`,
+          { headers: { Authorization: `Bearer ${googleCalendar.access_token}` } }
+        )
+
+        if (!eventsResponse.ok) continue
+
+        const eventsData = await eventsResponse.json() as any
+        for (const event of eventsData.items || []) {
+          events.push({
+            id: event.id,
+            summary: event.summary || '(No title)',
+            start: event.start?.dateTime || event.start?.date || '',
+            end: event.end?.dateTime || event.end?.date || '',
+            status: event.status || 'confirmed',
+            calendarId: cal.summary || cal.id,
+          })
+        }
+      }
+
+      // Sort by start time
+      events.sort((a, b) => a.start.localeCompare(b.start))
+
+      return { connected: true, events }
+    } catch (error) {
+      console.error('Failed to fetch calendar events:', error)
+      return { connected: true, events: [], error: String(error) }
+    }
+  }
+)
