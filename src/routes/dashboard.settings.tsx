@@ -15,8 +15,21 @@ function getHostUrl(): string {
   return 'https://skedular.online'
 }
 
+// Helper functions for unit conversion
+function minutesToUnit(minutes: number, unit: 'minutes' | 'hours' | 'days'): number {
+  if (unit === 'hours') return minutes / 60
+  if (unit === 'days') return minutes / (60 * 24)
+  return minutes
+}
+
+function unitToMinutes(value: number, unit: 'minutes' | 'hours' | 'days'): number {
+  if (unit === 'hours') return value * 60
+  if (unit === 'days') return value * 60 * 24
+  return value
+}
+
 function SettingsPage() {
-  const { user, loading: authLoading, logout } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [settingsForm, setSettingsForm] = useState({
@@ -29,6 +42,7 @@ function SettingsPage() {
   const [feedCopied, setFeedCopied] = useState(false)
   const [enablingFeed, setEnablingFeed] = useState(false)
   const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [minNoticeUnit, setMinNoticeUnit] = useState<'minutes' | 'hours' | 'days'>('hours')
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/login' })
@@ -67,11 +81,22 @@ function SettingsPage() {
         return
       }
       setProfile(p)
+
+      // Auto-detect best unit for minNotice
+      const minNoticeMinutes = p.settings.minNotice
+      let unit: 'minutes' | 'hours' | 'days' = 'minutes'
+      if (minNoticeMinutes % (60 * 24) === 0 && minNoticeMinutes >= 60 * 24) {
+        unit = 'days'
+      } else if (minNoticeMinutes % 60 === 0 && minNoticeMinutes >= 60) {
+        unit = 'hours'
+      }
+      setMinNoticeUnit(unit)
+
       setSettingsForm({
         defaultDuration: p.settings.defaultDuration,
         bufferTime: p.settings.bufferTime,
         maxPerDay: p.settings.maxPerDay,
-        minNotice: p.settings.minNotice,
+        minNotice: minutesToUnit(minNoticeMinutes, unit),
       })
 
       // Set calendar feed URL if enabled
@@ -83,7 +108,12 @@ function SettingsPage() {
 
   const handleSaveSettings = async () => {
     if (!user) return
-    await updateUserSettings(user.uid, settingsForm)
+    // Convert minNotice back to minutes before saving
+    const settingsToSave = {
+      ...settingsForm,
+      minNotice: Math.round(unitToMinutes(settingsForm.minNotice, minNoticeUnit)),
+    }
+    await updateUserSettings(user.uid, settingsToSave)
     // Refresh profile
     const p = await getUserProfile(user.uid)
     if (p) setProfile(p)
@@ -233,15 +263,34 @@ function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-text-secondary mb-1">Min notice (min)</label>
-                <input
-                  type="number"
-                  value={settingsForm.minNotice}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, minNotice: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-border-default rounded-lg"
-                  min={0}
-                  step={15}
-                />
+                <label className="block text-sm text-text-secondary mb-1">Min notice</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={settingsForm.minNotice}
+                    onChange={(e) => {
+                      const newValue = Number(e.target.value)
+                      setSettingsForm({ ...settingsForm, minNotice: newValue })
+                    }}
+                    className="flex-1 px-3 py-2 border border-border-default rounded-lg"
+                    min={0}
+                    step={minNoticeUnit === 'minutes' ? 15 : minNoticeUnit === 'hours' ? 1 : 0.5}
+                  />
+                  <select
+                    value={minNoticeUnit}
+                    onChange={(e) => {
+                      const newUnit = e.target.value as 'minutes' | 'hours' | 'days'
+                      const currentMinutes = unitToMinutes(settingsForm.minNotice, minNoticeUnit)
+                      setMinNoticeUnit(newUnit)
+                      setSettingsForm({ ...settingsForm, minNotice: minutesToUnit(currentMinutes, newUnit) })
+                    }}
+                    className="px-3 py-2 border border-border-default rounded-lg bg-white"
+                  >
+                    <option value="minutes">min</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                </div>
               </div>
             </div>
             <button
