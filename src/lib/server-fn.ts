@@ -437,16 +437,17 @@ interface BusyWindow {
 export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
   .inputValidator((input: CheckConflictsInput) => input)
   .handler(async ({ data, context }): Promise<{ connected: boolean; busyWindows: BusyWindow[] }> => {
-    const db = getFirebaseDb()
+    const { getDocument, initializeApp } = await import('@prmichaelsen/firebase-admin-sdk-v8')
+    const serviceAccount = (await import('../../skedular-prod-service.json')).default
+    try { initializeApp({ serviceAccount: serviceAccount as any, projectId: serviceAccount.project_id }) } catch (_) {}
 
     // Get user's Google Calendar connection
-    const userDoc = await getDoc(doc(db, 'users', data.userId))
-    if (!userDoc.exists()) {
+    const userData = await getDocument('users', data.userId)
+    if (!userData) {
       return { connected: false, busyWindows: [] }
     }
 
-    const userData = userDoc.data()
-    const googleCalendar = userData.google_calendar
+    const googleCalendar = userData.google_calendar as any
 
     // Check if Google Calendar is connected
     if (!googleCalendar || !googleCalendar.connected) {
