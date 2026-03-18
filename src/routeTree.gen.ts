@@ -18,6 +18,7 @@ import { Route as UsernameRouteImport } from './routes/$username'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
+import { Route as DashboardDebugCalendarRouteImport } from './routes/dashboard.debug-calendar'
 import { Route as CancelTokenRouteImport } from './routes/cancel.$token'
 
 const TermsRoute = TermsRouteImport.update({
@@ -65,6 +66,11 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardDebugCalendarRoute = DashboardDebugCalendarRouteImport.update({
+  id: '/debug-calendar',
+  path: '/debug-calendar',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const CancelTokenRoute = CancelTokenRouteImport.update({
   id: '/cancel/$token',
   path: '/cancel/$token',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
   '/cancel/$token': typeof CancelTokenRoute
+  '/dashboard/debug-calendar': typeof DashboardDebugCalendarRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
   '/cancel/$token': typeof CancelTokenRoute
+  '/dashboard/debug-calendar': typeof DashboardDebugCalendarRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
 }
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/terms': typeof TermsRoute
   '/cancel/$token': typeof CancelTokenRoute
+  '/dashboard/debug-calendar': typeof DashboardDebugCalendarRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/terms'
     | '/cancel/$token'
+    | '/dashboard/debug-calendar'
     | '/dashboard/settings'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/terms'
     | '/cancel/$token'
+    | '/dashboard/debug-calendar'
     | '/dashboard/settings'
     | '/dashboard'
   id:
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/terms'
     | '/cancel/$token'
+    | '/dashboard/debug-calendar'
     | '/dashboard/settings'
     | '/dashboard/'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/debug-calendar': {
+      id: '/dashboard/debug-calendar'
+      path: '/debug-calendar'
+      fullPath: '/dashboard/debug-calendar'
+      preLoaderRoute: typeof DashboardDebugCalendarRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/cancel/$token': {
       id: '/cancel/$token'
       path: '/cancel/$token'
@@ -232,11 +251,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardDebugCalendarRoute: typeof DashboardDebugCalendarRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardDebugCalendarRoute: DashboardDebugCalendarRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
