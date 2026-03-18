@@ -155,7 +155,7 @@ function BookingPage() {
             date: selectedDate.toISOString().split('T')[0],
           },
         })
-        setBusyWindows(result.busyWindows)
+        setBusyWindows(result?.busyWindows ?? [])
       } catch (error) {
         console.error('Failed to check Google Calendar conflicts:', error)
         setBusyWindows([]) // Fail open
