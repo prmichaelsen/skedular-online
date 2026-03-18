@@ -12,17 +12,7 @@ export const Route = createFileRoute('/dashboard/')({
 
 // Helper to get the correct host URL
 function getHostUrl(): string {
-  // In production, use the actual host from window.location
-  // In development/build, fall back to the configured URL
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin
-    // Only use window.location if it's not localhost (production)
-    if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-      return origin
-    }
-  }
-  // Fall back to configured production URL
-  return import.meta.env.VITE_APP_URL || 'https://skedular.online'
+  return 'https://skedular.online'
 }
 
 function DashboardPage() {

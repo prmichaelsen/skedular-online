@@ -159,7 +159,7 @@ export const sendBookingConfirmation = createServerFn({ method: 'POST' })
       return { success: false, error: 'Email not configured' }
     }
 
-    const baseUrl = process.env.VITE_APP_URL || 'https://skedular.online'
+    const baseUrl = 'https://skedular.online'
     const cancelUrl = `${baseUrl}/cancel/${data.cancelToken}`
     const bookingPageUrl = `${baseUrl}/${data.username}`
     const fromEmail = 'bookings@skedular.online'
@@ -315,7 +315,7 @@ export const generateICSFeed = createServerFn({ method: 'GET' })
       }
 
       // Build description with cancel link
-      const baseUrl = process.env.VITE_APP_URL || 'https://skedular.online'
+      const baseUrl = 'https://skedular.online'
       const cancelUrl = `${baseUrl}/cancel/${booking.cancelToken}`
       const description = [
         `Booked by ${escape(booking.bookerEmail)}`,
@@ -352,7 +352,7 @@ export const sendCancellationEmail = createServerFn({ method: 'POST' })
       return { success: false, error: 'Email not configured' }
     }
 
-    const baseUrl = process.env.VITE_APP_URL || 'https://skedular.online'
+    const baseUrl = 'https://skedular.online'
     const bookingPageUrl = `${baseUrl}/${data.username}`
     const fromEmail = 'bookings@skedular.online'
 
@@ -415,7 +415,7 @@ export const getGoogleCalendarOAuthUrl = createServerFn({ method: 'POST' })
       GOOGLE_CLIENT_SECRET: clientSecret,
     })
 
-    const baseUrl = env.VITE_APP_URL || import.meta.env.VITE_APP_URL || 'https://skedular.online'
+    const baseUrl = 'https://skedular.online'
     const redirectUri = `${baseUrl}/auth/google/callback`
     const authUrl = provider.getAuthUrl(data.userId, redirectUri)
 
