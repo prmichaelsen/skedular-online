@@ -463,9 +463,16 @@ export const checkGoogleCalendarConflicts = createServerFn({ method: 'POST' })
 
     try {
       // Parse date and create time range for the full day
+      // Query from start of previous day to end of next day (UTC) to catch all events
+      // that might fall on the target date in any timezone (max UTC offset is ±14 hours)
       const [year, month, day] = data.date.split('-').map(Number)
-      const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
-      const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59))
+      const targetDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+      const startDate = new Date(targetDate)
+      startDate.setUTCDate(startDate.getUTCDate() - 1)
+      startDate.setUTCHours(0, 0, 0, 0)
+      const endDate = new Date(targetDate)
+      endDate.setUTCDate(endDate.getUTCDate() + 1)
+      endDate.setUTCHours(23, 59, 59, 999)
 
       // Query Google Calendar FreeBusy API
       const { createGoogleCalendarProvider } = await import('@/lib/calendar-providers/google')
