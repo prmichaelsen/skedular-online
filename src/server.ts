@@ -28,7 +28,7 @@ export default {
 
       try {
         const userId = decodeURIComponent(state)
-        const redirectUri = `${url.origin}/auth/google/callback`
+        const redirectUri = 'https://skedular.online/auth/google/callback'
 
         // Create provider with env vars
         const provider = createGoogleCalendarProvider(env)
@@ -44,6 +44,7 @@ export default {
         return Response.redirect(dashboardUrl.toString(), 302)
       } catch (err) {
         console.error('Google OAuth callback error:', err)
+        console.error('Error details:', err instanceof Error ? err.message : String(err))
         dashboardUrl.searchParams.set('oauth_error', 'failed')
         return Response.redirect(dashboardUrl.toString(), 302)
       }
