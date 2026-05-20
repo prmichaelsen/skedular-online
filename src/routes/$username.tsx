@@ -117,20 +117,47 @@ function BookingPage() {
   // Booking flow state
   const dates = useMemo(() => generateDates(4), [])
 
-  // Find the first available date (has availability windows and isn't in the past)
+  // Per-date slot counts, computed from the same getAvailableSlots
+  // path used by the time-slot list (minus Google Calendar busy
+  // windows — those are fetched lazily per selected date). This
+  // grounds "is this day bookable" in actual computed slots rather
+  // than just "does this day-of-week have a window."
+  const dateAvailability = useMemo(() => {
+    const map = new Map<string, number>()
+    if (!availability || availability.mode !== 'custom' || !owner) return map
+    for (const d of dates) {
+      const slots = getAvailableSlots(
+        d,
+        availability.windows,
+        bookings,
+        owner.settings.defaultDuration,
+        owner.settings.bufferTime,
+        owner.settings.minNotice
+      )
+      map.set(d.toDateString(), slots.length)
+    }
+    return map
+  }, [dates, availability, bookings, owner])
+
+  // Find the first date with at least one actually-available slot.
+  // Falls back to null if no day in the 4-week window has slots; the
+  // UI's empty-state messaging covers that case.
   const defaultDate = useMemo(() => {
     if (!availability || availability.mode !== 'custom' || availability.windows.length === 0) return null
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return dates.find((d) => {
-      if (d < today) return false
-      return availability.windows.some((w) => w.dayOfWeek === d.getDay())
-    }) ?? null
-  }, [dates, availability])
+    return dates.find((d) => (dateAvailability.get(d.toDateString()) ?? 0) > 0) ?? null
+  }, [dates, availability, dateAvailability])
+
+  // Initial week offset jumps to the week containing the default
+  // date, so the picker opens already showing the pre-selected day.
+  const defaultWeekOffset = useMemo(() => {
+    if (!defaultDate) return 0
+    const idx = dates.findIndex((d) => d.toDateString() === defaultDate.toDateString())
+    return idx < 0 ? 0 : Math.floor(idx / 7)
+  }, [dates, defaultDate])
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(defaultDate)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-  const [weekOffset, setWeekOffset] = useState(0)
+  const [weekOffset, setWeekOffset] = useState(defaultWeekOffset)
   const [bookerName, setBookerName] = useState('')
   const [bookerEmail, setBookerEmail] = useState('')
   const [notes, setNotes] = useState('')
@@ -347,24 +374,31 @@ function BookingPage() {
               <div className="grid grid-cols-7 gap-2">
                 {weekDates.map((d) => {
                   const dow = d.getDay()
-                  const dayHasSlots = availability!.windows.some((w) => w.dayOfWeek === dow)
+                  // Day is "has slots" iff getAvailableSlots returned
+                  // at least one slot for it (accounts for bookings,
+                  // buffer, minNotice — not just day-of-week window).
+                  const dayHasSlots = (dateAvailability.get(d.toDateString()) ?? 0) > 0
                   const isSelected = selectedDate?.toDateString() === d.toDateString()
                   const isToday = d.toDateString() === new Date().toDateString()
                   const isPast = d < new Date(new Date().setHours(0, 0, 0, 0))
+                  const isDisabled = !dayHasSlots || isPast
 
                   return (
                     <button
                       key={d.toISOString()}
                       onClick={() => {
+                        if (isDisabled) return
                         setSelectedDate(d)
                         setSelectedSlot(null)
                       }}
-                      disabled={!dayHasSlots || isPast}
+                      disabled={isDisabled}
+                      aria-disabled={isDisabled}
+                      tabIndex={isDisabled ? -1 : 0}
                       className={`
                         p-3 rounded-xl text-center transition-colors
                         ${isSelected ? 'bg-primary text-white' : ''}
-                        ${!isSelected && dayHasSlots && !isPast ? 'hover:bg-bg-elevated border border-border-default' : ''}
-                        ${!dayHasSlots || isPast ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+                        ${!isSelected && !isDisabled ? 'hover:bg-bg-elevated border border-border-default' : ''}
+                        ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
                       `}
                     >
                       <div className="text-xs font-medium mb-1">{DAY_NAMES[dow]}</div>
